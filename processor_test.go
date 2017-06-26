@@ -8,7 +8,7 @@ import (
 	"testing"
 )
 
-var fakeErr1 = errors.New("fake error #1")
+var errFake1 = errors.New("fake error #1")
 
 func StringSliceContains(sl []string, s string) bool {
 	for _, v := range sl {
@@ -91,7 +91,7 @@ func TestSimple(t *testing.T) {
 			r:        strings.NewReader(""),
 			expected: "",
 			f: func(b []byte) ([]byte, error) {
-				return nil, fakeErr1
+				return nil, errFake1
 			},
 			err: nil,
 		},
@@ -100,9 +100,9 @@ func TestSimple(t *testing.T) {
 			r:        strings.NewReader("\n"),
 			expected: "",
 			f: func(b []byte) ([]byte, error) {
-				return nil, fakeErr1
+				return nil, errFake1
 			},
-			err: fakeErr1,
+			err: errFake1,
 		},
 	}
 

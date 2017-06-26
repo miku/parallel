@@ -121,7 +121,9 @@ func (p *Processor) Run() error {
 				wErr = err
 			}
 		}
-		bw.Flush()
+		if err := bw.Flush(); err != nil {
+			wErr = err
+		}
 		done <- true
 	}
 
