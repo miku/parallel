@@ -9,12 +9,12 @@ that transform data and where data is read in a mostly line orientied fashion.
 Note: The *order* of the input lines is not preserved in the output.
 
 The main type is a
-[parallel.Processor](https://github.com/miku/parallel/blob/5747c9046b220407f637a45b91c33e8c74b96276/processor.go#L65-L73),
+[parallel.Processor](https://github.com/miku/parallel/blob/fa00b8c221050cc7a84a666f124c9a8c9f0cd471/processor.go#L68-L76),
 which reads from an [io.Reader](https://golang.org/pkg/io/#Reader), applies a
 function to each input line (separated by a newline by default) and writes the
 result to an [io.Writer](https://golang.org/pkg/io/#Writer).
 
-The [transformation function](https://github.com/miku/parallel/blob/3e9da1f38057647e89c7f9f02663b360f35cbef6/processor.go#L53-L55) takes a byte slice and therefore does not assume
+The [transformation function](https://github.com/miku/parallel/blob/fa00b8c221050cc7a84a666f124c9a8c9f0cd471/processor.go#L56-L58) takes a byte slice and therefore does not assume
 any specific format, so the input may be plain lines, CSV, newline delimited
 JSON or similar line oriented formats. The output is just bytes and can again
 assume any format.
@@ -39,9 +39,9 @@ if err := p.Run(); err != nil {
 That's all the setup needed. For details and self contained programs, see [examples](https://github.com/miku/parallel/tree/master/examples).
 
 The processer expects a
-[parallel.TransformerFunc](https://github.com/miku/parallel/blob/3e9da1f38057647e89c7f9f02663b360f35cbef6/processor.go#L53-L55).
+[parallel.TransformerFunc](https://github.com/miku/parallel/blob/fa00b8c221050cc7a84a666f124c9a8c9f0cd471/processor.go#L56-L58).
 There are some functions, that take a byte slice and and return a byte slice,
-but do not return an error (an example would be [bytes.ToUpper](https://golang.org/pkg/bytes/#ToUpper)). These functions can be turned into a TransformerFunc with a simple helper:
+but do not return an error (an example would be [bytes.ToUpper](https://golang.org/pkg/bytes/#ToUpper)). These functions can be turned into a TransformerFunc with a simple [helper](https://github.com/miku/parallel/blob/fa00b8c221050cc7a84a666f124c9a8c9f0cd471/processor.go#L60-L66):
 
 ```go
 p := parallel.NewProcessor(os.Stdin, os.Stdout, parallel.ToTransformerFunc(bytes.ToUpper))
@@ -83,7 +83,7 @@ func main() {
 }
 ```
 
-* More examples: https://github.com/miku/parallel/tree/master/examples 
+* More examples: https://github.com/miku/parallel/tree/master/examples
 
 Adjusting the processor
 =======================
@@ -106,7 +106,7 @@ if err := p.Run(); err != nil {
 The default should be ok for a lot of use cases. Batches are kept in memory, so
 higher batch sizes will need more memory but will decrease the coordination
 overhead. Sometimes, a batch size of one can be [useful
-too](https://github.com/miku/parallel/blob/aec5aba6d7436314e160866d60803118a496f35b/examples/fetchall.go#L166).
+too](https://github.com/miku/parallel/blob/fa00b8c221050cc7a84a666f124c9a8c9f0cd471/examples/fetchall.go#L166).
 
 ----
 
