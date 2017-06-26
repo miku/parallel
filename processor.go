@@ -8,6 +8,9 @@ import (
 	"sync"
 )
 
+// Version of library.
+const Version = "0.1.0"
+
 // BytesBatch is a slice of byte slices.
 type BytesBatch struct {
 	b [][]byte
