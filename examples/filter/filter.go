@@ -7,7 +7,6 @@
 package main
 
 import (
-	"bytes"
 	"encoding/json"
 	"log"
 	"os"
@@ -37,10 +36,6 @@ func MarshalEnd(v interface{}, end []byte) ([]byte, error) {
 func main() {
 	r := strings.NewReader(input)
 	p := parallel.NewProcessor(r, os.Stdout, func(b []byte) ([]byte, error) {
-		// Ignore empty lines.
-		if len(bytes.TrimSpace(b)) == 0 {
-			return nil, nil
-		}
 		// Use an anonymous throwaway struct.
 		var entry struct {
 			Name       string `json:"name"`

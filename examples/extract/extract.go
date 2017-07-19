@@ -9,7 +9,6 @@
 package main
 
 import (
-	"bytes"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -34,10 +33,6 @@ func main() {
 	flag.Parse()
 
 	p := parallel.NewProcessor(os.Stdin, os.Stdout, func(b []byte) ([]byte, error) {
-		// Ignore empty lines.
-		if len(bytes.TrimSpace(b)) == 0 {
-			return nil, nil
-		}
 		// Unmarshal into generic map.
 		m := make(map[string]interface{})
 		if err := json.Unmarshal(b, &m); err != nil {
