@@ -3,6 +3,7 @@ package parallel
 
 import (
 	"bufio"
+	"bytes"
 	"io"
 	"runtime"
 	"sync"
@@ -70,6 +71,7 @@ type Processor struct {
 	BatchSize       int
 	RecordSeparator byte
 	NumWorkers      int
+	SkipEmptyLines  bool
 	r               io.Reader
 	w               io.Writer
 	f               TransformerFunc
@@ -81,6 +83,7 @@ func NewProcessor(r io.Reader, w io.Writer, f TransformerFunc) *Processor {
 		BatchSize:       10000,
 		RecordSeparator: '\n',
 		NumWorkers:      runtime.NumCPU(),
+		SkipEmptyLines:  true,
 		r:               r,
 		w:               w,
 		f:               f,
@@ -153,6 +156,9 @@ func (p *Processor) Run() error {
 		}
 		if err != nil {
 			return err
+		}
+		if len(bytes.TrimSpace(b)) == 0 && p.SkipEmptyLines {
+			continue
 		}
 		batch.Add(b)
 		if batch.Size() == p.BatchSize {

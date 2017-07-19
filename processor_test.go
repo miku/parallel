@@ -75,9 +75,9 @@ func TestSimple(t *testing.T) {
 			err: nil,
 		},
 		{
-			about:    `Empty lines are passed on.`,
+			about:    `Empty lines skipped.`,
 			r:        strings.NewReader("a\na\na\na\n\n\nb\n"),
-			expected: "\n\nB\n",
+			expected: "B\n",
 			f: func(b []byte) ([]byte, error) {
 				if strings.TrimSpace(string(b)) == "a" {
 					return []byte{}, nil
@@ -96,13 +96,13 @@ func TestSimple(t *testing.T) {
 			err: nil,
 		},
 		{
-			about:    `Error is passed on.`,
+			about:    `Error does not come through, if all lines are skipped.`,
 			r:        strings.NewReader("\n"),
 			expected: "",
 			f: func(b []byte) ([]byte, error) {
 				return nil, errFake1
 			},
-			err: errFake1,
+			err: nil,
 		},
 	}
 
