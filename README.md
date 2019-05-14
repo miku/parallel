@@ -1,5 +1,4 @@
-parallel
-========
+# parallel
 
 Process lines in parallel.
 
@@ -50,8 +49,7 @@ if err := p.Run(); err != nil {
 }
 ```
 
-Full Example
-------------
+## Full Example
 
 ```go
 // Uppercases each line. Order of lines is not preserved.
@@ -85,8 +83,7 @@ func main() {
 
 * More examples: https://github.com/miku/parallel/tree/master/examples
 
-Adjusting the processor
-=======================
+# Adjusting the processor
 
 The processor has a few attributes, that can be adjusted prior to running:
 
@@ -108,6 +105,9 @@ higher batch sizes will need more memory but will decrease the coordination
 overhead. Sometimes, a batch size of one can be [useful
 too](https://github.com/miku/parallel/blob/fa00b8c221050cc7a84a666f124c9a8c9f0cd471/examples/fetchall.go#L166).
 
-----
+# Random performance data point
 
-[![asciicast](https://asciinema.org/a/e2lEDObP9ebVxUFcvARrQHRlf.png)](https://asciinema.org/a/e2lEDObP9ebVxUFcvARrQHRlf?autoplay=1)
+Combining parallel with a fast JSON library, such as
+[jsoniter](https://github.com/json-iterator/go), one can process up to 100000
+JSON documents (of about 1K in size) per second. Here is an [example
+snippet](https://gist.github.com/miku/62f64de2016dc38186e21270715e8016#file-main-go).
