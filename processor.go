@@ -5,8 +5,10 @@ import (
 	"bufio"
 	"bytes"
 	"io"
+	"log"
 	"runtime"
 	"sync"
+	"time"
 )
 
 // Version of library.
@@ -75,6 +77,8 @@ type Processor struct {
 	r               io.Reader
 	w               io.Writer
 	f               TransformerFunc
+
+	LogEvery int // Log progress every `LogEvery` docs.
 }
 
 // NewProcessor creates a new line processor.
@@ -132,10 +136,13 @@ func (p *Processor) Run() error {
 		}
 		done <- true
 	}
-
-	queue := make(chan [][]byte)
-	out := make(chan []byte)
-	done := make(chan bool)
+	var (
+		queue   = make(chan [][]byte)
+		out     = make(chan []byte)
+		done    = make(chan bool)
+		total   int64
+		started = time.Now()
+	)
 
 	var wg sync.WaitGroup
 
@@ -161,7 +168,11 @@ func (p *Processor) Run() error {
 			continue
 		}
 		batch.Add(b)
+		if p.LogEvery > 0 && batch.Size()%p.LogEvery == 0 {
+			log.Printf("parallel: dispatched %d lines (%0.2f lines/s)", total, float64(total)/time.Since(started).Seconds())
+		}
 		if batch.Size() == p.BatchSize {
+			total += int64(batch.Size())
 			// To avoid checking on each loop, we only check for worker or write errors here.
 			if wErr != nil {
 				break
