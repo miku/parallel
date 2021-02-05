@@ -74,11 +74,10 @@ type Processor struct {
 	RecordSeparator byte
 	NumWorkers      int
 	SkipEmptyLines  bool
+	Verbose         bool
 	r               io.Reader
 	w               io.Writer
 	f               TransformerFunc
-
-	Verbose bool
 }
 
 // NewProcessor creates a new line processor.
