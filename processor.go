@@ -78,7 +78,7 @@ type Processor struct {
 	w               io.Writer
 	f               TransformerFunc
 
-	LogEvery int // Log progress every `LogEvery` docs.
+	Verbose bool
 }
 
 // NewProcessor creates a new line processor.
@@ -168,11 +168,11 @@ func (p *Processor) Run() error {
 			continue
 		}
 		batch.Add(b)
-		if p.LogEvery > 0 && batch.Size()%p.LogEvery == 0 {
-			log.Printf("parallel: dispatched %d lines (%0.2f lines/s)", total, float64(total)/time.Since(started).Seconds())
-		}
 		if batch.Size() == p.BatchSize {
-			total += int64(batch.Size())
+			if p.Verbose {
+				log.Printf("parallel: dispatched %d lines (%0.2f lines/s)", total, float64(total)/time.Since(started).Seconds())
+			}
+			total += int64(p.BatchSize)
 			// To avoid checking on each loop, we only check for worker or write errors here.
 			if wErr != nil {
 				break
