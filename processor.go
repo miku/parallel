@@ -104,13 +104,11 @@ func (p *Processor) RunWorkers(numWorkers int) error {
 
 // Run starts the workers, crunching through the input.
 func (p *Processor) Run() error {
-
 	// wErr signals a worker or writer error. If an error occurs, the items in
 	// the queue are still process, just no items are added to the queue. There
 	// is only one way to toggle this, from false to true, so we don't care
 	// about synchronisation.
 	var wErr error
-
 	// worker takes []byte batches from a channel queue, executes f and sends the result to the out channel.
 	worker := func(queue chan [][]byte, out chan []byte, f TransformerFunc, wg *sync.WaitGroup) {
 		defer wg.Done()
@@ -124,7 +122,6 @@ func (p *Processor) Run() error {
 			}
 		}
 	}
-
 	// writer buffers writes.
 	writer := func(w io.Writer, bc chan []byte, done chan bool) {
 		bw := bufio.NewWriter(w)
@@ -145,19 +142,14 @@ func (p *Processor) Run() error {
 		total   int64
 		started = time.Now()
 	)
-
 	var wg sync.WaitGroup
-
 	go writer(p.w, out, done)
-
 	for i := 0; i < p.NumWorkers; i++ {
 		wg.Add(1)
 		go worker(queue, out, p.f, &wg)
 	}
-
 	batch := NewBytesBatchCapacity(p.BatchSize)
 	br := bufio.NewReader(p.r)
-
 	for {
 		b, err := br.ReadBytes(p.RecordSeparator)
 		if err == io.EOF {
@@ -183,14 +175,11 @@ func (p *Processor) Run() error {
 			batch.Reset()
 		}
 	}
-
 	queue <- batch.Slice()
 	batch.Reset()
-
 	close(queue)
 	wg.Wait()
 	close(out)
 	<-done
-
 	return wErr
 }
