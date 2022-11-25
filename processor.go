@@ -75,9 +75,9 @@ type Processor struct {
 	NumWorkers      int
 	SkipEmptyLines  bool
 	Verbose         bool
-	r               io.Reader
-	w               io.Writer
-	f               TransformerFunc
+	R               io.Reader
+	W               io.Writer
+	F               TransformerFunc
 }
 
 // New is a preferred way to create a new parallel processor.
@@ -90,9 +90,9 @@ func NewProcessor(r io.Reader, w io.Writer, f TransformerFunc) *Processor {
 		RecordSeparator: '\n',
 		NumWorkers:      runtime.NumCPU(),
 		SkipEmptyLines:  true,
-		r:               r,
-		w:               w,
-		f:               f,
+		R:               r,
+		W:               w,
+		F:               f,
 	}
 }
 
@@ -143,13 +143,13 @@ func (p *Processor) Run() error {
 		started = time.Now()
 	)
 	var wg sync.WaitGroup
-	go writer(p.w, out, done)
+	go writer(p.W, out, done)
 	for i := 0; i < p.NumWorkers; i++ {
 		wg.Add(1)
-		go worker(queue, out, p.f, &wg)
+		go worker(queue, out, p.F, &wg)
 	}
 	batch := NewBytesBatchCapacity(p.BatchSize)
-	br := bufio.NewReader(p.r)
+	br := bufio.NewReader(p.R)
 	for {
 		b, err := br.ReadBytes(p.RecordSeparator)
 		if err == io.EOF {
