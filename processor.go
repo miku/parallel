@@ -80,6 +80,9 @@ type Processor struct {
 	f               TransformerFunc
 }
 
+// New is a preferred way to create a new parallel processor.
+var New = NewProcessor
+
 // NewProcessor creates a new line processor.
 func NewProcessor(r io.Reader, w io.Writer, f TransformerFunc) *Processor {
 	return &Processor{
