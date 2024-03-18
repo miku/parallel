@@ -12,7 +12,7 @@ import (
 )
 
 // Version of library.
-const Version = "0.1.0"
+const Version = "0.1.1"
 
 // BytesBatch is a slice of byte slices.
 type BytesBatch struct {
