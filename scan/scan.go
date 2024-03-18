@@ -1,4 +1,4 @@
-// Package scan accepts a SplitFun and generalizes batches to non-line oriented input, e.g. XML.
+// Package scan accepts a bufio.SplitFunc and generalizes batches to non-line oriented input, e.g. XML.
 package scan
 
 import (
