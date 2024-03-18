@@ -3,6 +3,7 @@ package scan
 
 import (
 	"bufio"
+	"bytes"
 	"io"
 	"runtime"
 	"sync"
@@ -84,7 +85,7 @@ func (p *Processor) Run() error {
 	scanner.Split(p.SplitFunc)
 	// batch and number of elements put into batch, we do not distinguish
 	// items; could also limit the size; TODO
-	var batch []byte
+	var buf bytes.Buffer
 	var i int
 	for scanner.Scan() {
 		if i == p.BatchSize {
@@ -92,16 +93,16 @@ func (p *Processor) Run() error {
 			if wErr != nil {
 				break
 			}
-			b := make([]byte, len(batch))
-			copy(b, batch)
+			b := make([]byte, buf.Len())
+			copy(b, buf.Bytes())
 			queue <- b
-			batch = nil // reset, enough?
+			buf.Reset()
 			i = 0
 		}
-		batch = append(batch, scanner.Bytes()...)
+		buf.Write(scanner.Bytes())
 		i++
 	}
-	queue <- batch
+	queue <- buf.Bytes() // no other modification
 	close(queue)
 	wg.Wait()
 	close(out)

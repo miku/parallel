@@ -4,13 +4,25 @@ import (
 	"bytes"
 	"encoding/json"
 	"encoding/xml"
+	"flag"
 	"io"
 	"log"
 	"os"
+	"runtime/pprof"
+	"sync"
 
 	"github.com/miku/parallel/scan"
 	"github.com/miku/xmlstream"
 )
+
+var cpuprofile = flag.String("cpuprofile", "", "write cpu profile to file")
+
+var bufPool = sync.Pool{
+	New: func() interface{} {
+		var b bytes.Buffer
+		return b
+	},
+}
 
 type TagSplitter struct {
 	tag       []byte       // XML tag to split on
@@ -83,12 +95,25 @@ func (ts *TagSplitter) Split(data []byte, atEOF bool) (advance int, token []byte
 }
 
 func main() {
+	flag.Parse()
+	if *cpuprofile != "" {
+		f, err := os.Create(*cpuprofile)
+		if err != nil {
+			log.Fatal(err)
+		}
+		pprof.StartCPUProfile(f)
+		defer pprof.StopCPUProfile()
+	}
 	ts := NewTagSplitter("PubmedArticle")
 	proc := scan.New(os.Stdin, os.Stdout, func(p []byte) ([]byte, error) {
+		// setup new xml streaming scanner
 		r := bytes.NewReader(p)
 		scanner := xmlstream.NewScanner(r, new(Article))
-		var buf bytes.Buffer
+		// get a buffer to write result to
+		buf := bufPool.Get().(bytes.Buffer)
+		defer bufPool.Put(buf)
 		var enc = json.NewEncoder(&buf)
+		// iterate over batch
 		for scanner.Scan() {
 			tag := scanner.Element()
 			if article, ok := tag.(*Article); ok {
@@ -102,7 +127,6 @@ func main() {
 			}
 		}
 		return buf.Bytes(), nil
-
 	})
 	proc.Split(ts.Split)
 	if err := proc.Run(); err != nil {
