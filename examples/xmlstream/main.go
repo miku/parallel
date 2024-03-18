@@ -2,7 +2,6 @@ package main
 
 import (
 	"bytes"
-	"encoding/json"
 	"encoding/xml"
 	"flag"
 	"io"
@@ -13,6 +12,7 @@ import (
 
 	"github.com/miku/parallel/scan"
 	"github.com/miku/xmlstream"
+	"github.com/segmentio/encoding/json"
 )
 
 var cpuprofile = flag.String("cpuprofile", "", "write cpu profile to file")
