@@ -105,6 +105,16 @@ higher batch sizes will need more memory but will decrease the coordination
 overhead. Sometimes, a batch size of one can be [useful
 too](https://github.com/miku/parallel/blob/fa00b8c221050cc7a84a666f124c9a8c9f0cd471/examples/fetchall.go#L166).
 
+# Experimental arbitrary record support
+
+[scan_test.go](https://github.com/miku/parallel/blob/master/scan/scan_test.go)
+contains an example of how to use a
+[bufio.SplitFunc](https://pkg.go.dev/bufio#SplitFunc) to separate records. The
+original `parallel` implementation only looked at lines (akin to
+[bufio.ScanLines](https://pkg.go.dev/bufio#ScanLines)), but there are other
+potential use cases, such as parallel parsing of XML.
+
+
 # Random performance data point
 
 Combining parallel with a fast JSON library, such as
