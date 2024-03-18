@@ -125,6 +125,7 @@ func main() {
 		}
 		return buf.Bytes(), nil
 	})
+	// batch XML elements, without expensive XML parsing
 	proc.Split(ts.Split)
 	if err := proc.Run(); err != nil {
 		log.Fatal(err)
