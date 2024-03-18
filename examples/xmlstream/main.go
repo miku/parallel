@@ -50,7 +50,6 @@ func (ts *TagSplitter) Split(data []byte, atEOF bool) (advance int, token []byte
 		ts.pos = 0
 	}()
 	if atEOF {
-		log.Printf("eof: %d, %d", ts.pos, ts.buf.Len())
 		// at the end, just return the rest
 		// TODO: make sure we have a proper end tag (data may be broken)
 		ts.buf.Write(data)
@@ -61,11 +60,9 @@ func (ts *TagSplitter) Split(data []byte, atEOF bool) (advance int, token []byte
 			ts.count = 0
 			b := ts.buf.Bytes()
 			ts.buf.Reset()
-			log.Printf("found batch: %d", len(b))
 			return ts.pos, b, nil
 		}
 		if ts.in {
-			log.Printf("inside tag: %d", ts.pos)
 			v := bytes.Index(data[ts.pos:], ts.closing)
 			if v == -1 {
 				// current tag exceeds data, so write all and exit Split
