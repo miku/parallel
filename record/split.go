@@ -18,6 +18,7 @@ type TagSplitter struct {
 	in        bool         // whether we are inside the tag or not
 	buf       bytes.Buffer // read buffer
 	count     int          // the number of elements in the buffer so far
+	done      bool         // signals that we are done processing
 }
 
 // NewTagSplitter returns a TagSplitter for a given XML element name, given as string.
@@ -35,17 +36,22 @@ func (ts *TagSplitter) Split(data []byte, atEOF bool) (advance int, token []byte
 	defer func() {
 		ts.pos = 0
 	}()
+	if ts.done {
+		return 0, nil, io.EOF
+	}
 	if atEOF {
-		if len(data) == 0 && ts.buf.Len() == 0 {
-			return 0, nil, io.EOF
-		}
 		// at the end, just return the rest; we do not care, if there is a
 		// proper end tag, that is the problem of the calling code
 		//
 		// if we return io.EOF, Scan() would stop immediately, hence we set
 		// done to true and return in the subsequent call, only
-		ts.buf.Write(data)
-		return len(data), ts.buf.Bytes(), nil
+		ts.done = true
+		if len(data) == 0 && ts.buf.Len() == 0 {
+			return 0, nil, nil
+		} else {
+			ts.buf.Write(data)
+			return len(data), ts.buf.Bytes(), nil
+		}
 	}
 	for {
 		if ts.BatchSize == ts.count {

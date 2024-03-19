@@ -54,8 +54,40 @@ func TestSplit(t *testing.T) {
 			r:         strings.NewReader("<a><a>hello</a></a>"),
 			tag:       "a",
 			batchSize: 1,
-			result:    []string{"<a><a>hello</a></a>"}, // TODO
-			err:       ErrNestedTagsNotImplemented,
+			result:    []string{"<a><a>hello</a></a>"},
+			err:       ErrNestedTagsNotImplemented, // TODO
+		},
+		{
+			about:     "three tags, batch size 2",
+			r:         strings.NewReader("<a>1</a><a>2</a><a>3</a>"),
+			tag:       "a",
+			batchSize: 2,
+			result:    []string{"<a>1</a><a>2</a>", "<a>3</a>"},
+			err:       nil,
+		},
+		{
+			about:     "four tags, batch size 2, noise",
+			r:         strings.NewReader("<a>1</a><a>2</a><a>3</a><x></x><a>4</a>"),
+			tag:       "a",
+			batchSize: 2,
+			result:    []string{"<a>1</a><a>2</a>", "<a>3</a><a>4</a>"},
+			err:       nil,
+		},
+		{
+			about:     "single matching tag, noise",
+			r:         strings.NewReader("<a>1</a><a>2</a><a>3</a><x>X</x><a>4</a>"),
+			tag:       "x",
+			batchSize: 2,
+			result:    []string{"<x>X</x>"},
+			err:       nil,
+		},
+		{
+			about:     "no matching tag at all",
+			r:         strings.NewReader("<a>1</a><a>2</a><a>3</a><x></x><a>4</a>"),
+			tag:       "z",
+			batchSize: 2,
+			result:    nil,
+			err:       nil,
 		},
 	}
 	for _, c := range cases {
