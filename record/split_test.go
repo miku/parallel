@@ -54,23 +54,25 @@ func TestSplit(t *testing.T) {
 			r:         strings.NewReader("<a><a>hello</a></a>"),
 			tag:       "a",
 			batchSize: 1,
-			result:    []string{"<a><a>hello</a></a>"},
-			err:       nil,
+			result:    []string{"<a><a>hello</a></a>"}, // TODO
+			err:       ErrNestedTagsNotImplemented,
 		},
 	}
 	for _, c := range cases {
-		s := bufio.NewScanner(c.r)
-		ts := NewTagSplitter(c.tag)
+		var (
+			s      = bufio.NewScanner(c.r)
+			ts     = NewTagSplitter(c.tag)
+			result []string
+		)
 		ts.BatchSize = c.batchSize
 		s.Split(ts.Split)
-		var result []string
 		for s.Scan() {
 			result = append(result, s.Text())
 		}
 		if s.Err() != c.err {
 			t.Errorf("got %v, want %v", s.Err(), c.err)
 		}
-		if !reflect.DeepEqual(result, c.result) {
+		if s.Err() == nil && !reflect.DeepEqual(result, c.result) {
 			t.Errorf("got (%d) %v, want (%d) %v", len(result), result, len(c.result), c.result)
 		}
 	}

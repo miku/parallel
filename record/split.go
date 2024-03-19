@@ -2,8 +2,11 @@ package record
 
 import (
 	"bytes"
+	"errors"
 	"io"
 )
+
+var ErrNestedTagsNotImplemented = errors.New("nested tags not implemented")
 
 // TagSplitter splits a stream on a given XML element.
 type TagSplitter struct {
@@ -46,6 +49,9 @@ func (ts *TagSplitter) Split(data []byte, atEOF bool) (advance int, token []byte
 	}
 	for {
 		if ts.BatchSize == ts.count {
+			if bytes.Count(ts.buf.Bytes(), ts.opening) != bytes.Count(ts.buf.Bytes(), ts.closing) {
+				return 0, nil, ErrNestedTagsNotImplemented
+			}
 			ts.count = 0
 			b := ts.buf.Bytes()
 			ts.buf.Reset()
