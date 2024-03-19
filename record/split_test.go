@@ -55,7 +55,7 @@ func TestSplit(t *testing.T) {
 			tag:       "a",
 			batchSize: 1,
 			result:    []string{"<a><a>hello</a></a>"},
-			err:       ErrNestedTagsNotImplemented, // TODO
+			err:       ErrNestedTagsWithSameNameNotImplemented, // TODO
 		},
 		{
 			about:     "three tags, batch size 2",
