@@ -2,7 +2,7 @@ SHELL = /bin/bash
 
 .PHONY: test
 test:
-	go test -cover ./...
+	go test -v -cover ./...
 
 uppercase: examples/uppercase/uppercase.go
 	go build -o $@ $<

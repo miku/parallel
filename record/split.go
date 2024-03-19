@@ -7,10 +7,10 @@ import (
 
 // TagSplitter splits a stream on a given XML element.
 type TagSplitter struct {
+	BatchSize int          // number of elements to collect in one batch
 	tag       []byte       // XML tag to split on
 	opening   []byte       // the opening tag to look for
 	closing   []byte       // the closing tag to look for
-	batchSize int          // number of elements to collect in one batch
 	pos       int          // current read position within data
 	in        bool         // whether we are inside the tag or not
 	buf       bytes.Buffer // read buffer
@@ -23,7 +23,7 @@ func NewTagSplitter(tag string) *TagSplitter {
 		tag:       []byte(tag),
 		opening:   append(append([]byte("<"), []byte(tag)...), []byte(">")...), // TODO: respect namespaces
 		closing:   append(append([]byte("</"), []byte(tag)...), []byte(">")...),
-		batchSize: 100,
+		BatchSize: 100,
 	}
 }
 
@@ -33,13 +33,19 @@ func (ts *TagSplitter) Split(data []byte, atEOF bool) (advance int, token []byte
 		ts.pos = 0
 	}()
 	if atEOF {
+		if len(data) == 0 && ts.buf.Len() == 0 {
+			return 0, nil, io.EOF
+		}
 		// at the end, just return the rest; we do not care, if there is a
 		// proper end tag, that is the problem of the calling code
+		//
+		// if we return io.EOF, Scan() would stop immediately, hence we set
+		// done to true and return in the subsequent call, only
 		ts.buf.Write(data)
-		return len(data), ts.buf.Bytes(), io.EOF
+		return len(data), ts.buf.Bytes(), nil
 	}
 	for {
-		if ts.batchSize == ts.count {
+		if ts.BatchSize == ts.count {
 			ts.count = 0
 			b := ts.buf.Bytes()
 			ts.buf.Reset()
@@ -55,8 +61,12 @@ func (ts *TagSplitter) Split(data []byte, atEOF bool) (advance int, token []byte
 				return len(data), nil, nil
 			} else {
 				// end tag found, write and increase counter
-				ts.buf.Write(data[ts.pos : ts.pos+v])
-				ts.buf.Write(data[ts.pos+v : ts.pos+v+len(ts.closing)])
+				if _, err = ts.buf.Write(data[ts.pos : ts.pos+v]); err != nil {
+					return 0, nil, err
+				}
+				if _, err = ts.buf.Write(data[ts.pos+v : ts.pos+v+len(ts.closing)]); err != nil {
+					return 0, nil, err
+				}
 				ts.in = false
 				ts.count++
 				ts.pos = ts.pos + v + len(ts.closing)
