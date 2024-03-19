@@ -49,7 +49,9 @@ func (ts *TagSplitter) Split(data []byte, atEOF bool) (advance int, token []byte
 		if len(data) == 0 && ts.buf.Len() == 0 {
 			return 0, nil, nil
 		} else {
-			ts.buf.Write(data)
+			if _, err := ts.buf.Write(data); err != nil {
+				return 0, nil, err
+			}
 			return len(data), ts.buf.Bytes(), nil
 		}
 	}
