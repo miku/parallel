@@ -1,5 +1,5 @@
 // Package scan accepts a bufio.SplitFunc and generalizes batches to non-line oriented input, e.g. XML.
-package scan
+package record
 
 import (
 	"bufio"
@@ -20,9 +20,6 @@ type Processor struct {
 	F          func([]byte) ([]byte, error)
 }
 
-// New is a preferred way to create a new parallel processor.
-var New = NewProcessor
-
 // NewProcessor creates a new line processor.
 func NewProcessor(r io.Reader, w io.Writer, f func([]byte) ([]byte, error)) *Processor {
 	return &Processor{
@@ -34,7 +31,7 @@ func NewProcessor(r io.Reader, w io.Writer, f func([]byte) ([]byte, error)) *Pro
 	}
 }
 
-// Split set the splitter function to use.
+// Split set the SplitFunc to be used to identify records.
 func (p *Processor) Split(f bufio.SplitFunc) {
 	p.SplitFunc = f
 }

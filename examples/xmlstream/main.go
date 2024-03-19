@@ -10,7 +10,7 @@ import (
 	"runtime/pprof"
 	"sync"
 
-	"github.com/miku/parallel/scan"
+	"github.com/miku/parallel/record"
 	"github.com/miku/xmlstream"
 	"github.com/segmentio/encoding/json"
 )
@@ -102,7 +102,7 @@ func main() {
 		defer pprof.StopCPUProfile()
 	}
 	ts := NewTagSplitter("PubmedArticle")
-	proc := scan.New(os.Stdin, os.Stdout, func(p []byte) ([]byte, error) {
+	proc := record.NewProcessor(os.Stdin, os.Stdout, func(p []byte) ([]byte, error) {
 		// setup new xml streaming scanner
 		r := bytes.NewReader(p)
 		scanner := xmlstream.NewScanner(r, new(Article))

@@ -1,4 +1,4 @@
-package scan
+package record
 
 import (
 	"bytes"
@@ -11,7 +11,7 @@ func TestProcessor(t *testing.T) {
 	data := `123 XXX 456 XXX 789 XXX `
 	r := strings.NewReader(data)
 	var buf bytes.Buffer
-	p := New(r, &buf, func(p []byte) ([]byte, error) {
+	p := NewProcessor(r, &buf, func(p []byte) ([]byte, error) {
 		// this processor will just duplicate the input, e.g. turn "123 " into "123 123 ", etc.
 		return append(p, p...), nil
 	})
