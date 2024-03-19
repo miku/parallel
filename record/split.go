@@ -24,10 +24,10 @@ type TagSplitter struct {
 // NewTagSplitter returns a TagSplitter for a given XML element name, given as string.
 func NewTagSplitter(tag string) *TagSplitter {
 	return &TagSplitter{
-		tag:       []byte(tag),
-		opening:   append(append([]byte("<"), []byte(tag)...), []byte(">")...), // TODO: respect namespaces
-		closing:   append(append([]byte("</"), []byte(tag)...), []byte(">")...),
 		BatchSize: 100,
+		tag:       []byte(tag),
+		opening:   []byte("<" + tag), // additional check required; next char must be '>' or whitespace
+		closing:   []byte("</" + tag + ">"),
 	}
 }
 
@@ -90,9 +90,12 @@ func (ts *TagSplitter) Split(data []byte, atEOF bool) (advance int, token []byte
 				// nothing found in rest of data, move on
 				return len(data), nil, nil
 			} else {
-				// found start tag
-				ts.in = true
-				ts.pos = ts.pos + v
+				k := ts.pos + v + 2
+				if data[k] == ' ' || data[k] == '>' {
+					// found start tag
+					ts.in = true
+					ts.pos = ts.pos + v
+				}
 			}
 		}
 	}

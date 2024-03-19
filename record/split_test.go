@@ -89,6 +89,14 @@ func TestSplit(t *testing.T) {
 			result:    nil,
 			err:       nil,
 		},
+		{
+			about:     "works with attributes",
+			r:         strings.NewReader(`<a z="ok">1</a>`),
+			tag:       "a",
+			batchSize: 1,
+			result:    []string{`<a z="ok">1</a>`},
+			err:       nil,
+		},
 	}
 	for _, c := range cases {
 		var (
