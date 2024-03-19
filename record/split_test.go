@@ -141,10 +141,10 @@ func TestSplit(t *testing.T) {
 			result = append(result, s.Text())
 		}
 		if s.Err() != c.err {
-			t.Errorf("got %v, want %v", s.Err(), c.err)
+			t.Errorf("[%s] got %v, want %v", c.about, s.Err(), c.err)
 		}
 		if s.Err() == nil && !reflect.DeepEqual(result, c.result) {
-			t.Errorf("got (%d) %v, want (%d) %v", len(result), result, len(c.result), c.result)
+			t.Errorf("[%s] got (%d) %v, want (%d) %v", c.about, len(result), result, len(c.result), c.result)
 		}
 	}
 }
