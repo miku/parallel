@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"errors"
 	"io"
-	"log"
 )
 
 var ErrNestedTagsWithSameNameNotImplemented = errors.New("nested tags not implemented")
@@ -41,7 +40,6 @@ func (ts *TagSplitter) Split(data []byte, atEOF bool) (advance int, token []byte
 		return 0, nil, io.EOF
 	}
 	if atEOF {
-		log.Printf("atEOF")
 		// at the end, just return the rest; we do not care, if there is a
 		// proper end tag, that is the problem of the calling code
 		//
@@ -59,9 +57,7 @@ func (ts *TagSplitter) Split(data []byte, atEOF bool) (advance int, token []byte
 	}
 	for {
 		if ts.BatchSize == ts.count {
-			if bytes.Count(ts.buf.Bytes(), ts.opening) != bytes.Count(ts.buf.Bytes(), ts.closing) {
-				return 0, nil, ErrNestedTagsWithSameNameNotImplemented
-			}
+			// TODO: check for nested tags with the same name
 			ts.count = 0
 			b := ts.buf.Bytes()
 			ts.buf.Reset()
