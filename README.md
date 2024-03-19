@@ -116,7 +116,7 @@ potential use cases, such as parallel parsing of XML.
 
 Full example of parallel XML parsing (requires lots of RAM, currently):
 [examples/xmlstream/main.go](https://github.com/miku/parallel/blob/master/examples/xmlstream/main.go),
-but can process about 60K XML docs/s (on a 32-core machine).
+but can process about 3.4M complex XML docs/min (on a 32-core machine).
 
 # Random performance data point
 
