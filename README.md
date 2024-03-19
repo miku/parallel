@@ -107,13 +107,16 @@ too](https://github.com/miku/parallel/blob/fa00b8c221050cc7a84a666f124c9a8c9f0cd
 
 # Experimental arbitrary record support
 
-[scan_test.go](https://github.com/miku/parallel/blob/master/scan/scan_test.go)
-contains an example of how to use a
+[split_test.go](https://github.com/miku/parallel/blob/master/record/split_test.go)
+contains an examples of how to use a
 [bufio.SplitFunc](https://pkg.go.dev/bufio#SplitFunc) to separate records. The
-original `parallel` implementation only looked at lines (akin to
+original `parallel` implementation only looked at **lines** (akin to
 [bufio.ScanLines](https://pkg.go.dev/bufio#ScanLines)), but there are other
 potential use cases, such as parallel parsing of XML.
 
+Full example of parallel XML parsing (requires lots of RAM, currently):
+[examples/xmlstream/main.go](https://github.com/miku/parallel/blob/master/examples/xmlstream/main.go),
+but can process about 60K XML docs/s (on a 32-core machine).
 
 # Random performance data point
 
