@@ -91,7 +91,7 @@ func (ts *TagSplitter) Split(data []byte, atEOF bool) (advance int, token []byte
 				return len(data), nil, nil
 			} else {
 				k := ts.pos + v + 2
-				if data[k] == ' ' || data[k] == '>' {
+				if data[k] == ' ' || data[k] == '\t' || data[k] == '>' {
 					// found start tag
 					ts.in = true
 					ts.pos = ts.pos + v
