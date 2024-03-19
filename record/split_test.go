@@ -90,12 +90,43 @@ func TestSplit(t *testing.T) {
 			err:       nil,
 		},
 		{
+			about:     "prefix tag name",
+			r:         strings.NewReader(`<PubmedArticles><PubmedArticle>1</PubmedArticle></PubmedArticles>`),
+			tag:       "PubmedArticle",
+			batchSize: 1,
+			result:    []string{`<PubmedArticle>1</PubmedArticle>`},
+			err:       nil,
+		},
+		{
 			about:     "works with attributes",
 			r:         strings.NewReader(`<a z="ok">1</a>`),
 			tag:       "a",
 			batchSize: 1,
 			result:    []string{`<a z="ok">1</a>`},
 			err:       nil,
+		},
+		{
+			about:     "more attributes",
+			r:         strings.NewReader(`NNN <a>1</a> NNN <a k="v">2</a> NNN`),
+			tag:       "a",
+			batchSize: 1,
+			result:    []string{`<a>1</a>`, `<a k="v">2</a>`},
+			err:       nil,
+		},
+		{
+			about: "newlines",
+			r: strings.NewReader(`NNN
+				<a>1
+</a> NNN <a k="v">
+2
+</a>NNN`),
+			tag:       "a",
+			batchSize: 1,
+			result: []string{`<a>1
+</a>`, `<a k="v">
+2
+</a>`},
+			err: nil,
 		},
 	}
 	for _, c := range cases {

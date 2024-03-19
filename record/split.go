@@ -84,18 +84,24 @@ func (ts *TagSplitter) Split(data []byte, atEOF bool) (advance int, token []byte
 				ts.pos = ts.pos + v + len(ts.closing)
 			}
 		} else {
-			// search for the next opening tag
-			v := bytes.Index(data[ts.pos:], ts.opening)
-			if v == -1 {
-				// nothing found in rest of data, move on
-				return len(data), nil, nil
-			} else {
-				k := ts.pos + v + 2
-				if data[k] == ' ' || data[k] == '\t' || data[k] == '>' {
-					// found start tag
-					ts.in = true
-					ts.pos = ts.pos + v
+			for {
+				// search for the next opening tag
+				v := bytes.Index(data[ts.pos:], ts.opening)
+				if v == -1 {
+					// nothing found in rest of data, move on
+					return len(data), nil, nil
+				} else {
+					k := v + 2
+					if data[k] == ' ' || data[k] == '\t' || data[k] == '>' {
+						// found start tag
+						ts.in = true
+						ts.pos = ts.pos + v
+						break
+					} else {
+						ts.pos = ts.pos + 1
+					}
 				}
+
 			}
 		}
 	}
