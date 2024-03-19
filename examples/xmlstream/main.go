@@ -55,6 +55,9 @@ func main() {
 				}
 			}
 		}
+		if scanner.Err() != nil {
+			return nil, scanner.Err()
+		}
 		return buf.Bytes(), nil
 	})
 	// batch XML elements, without expensive XML parsing
