@@ -23,7 +23,7 @@ type Processor struct {
 // NewProcessor creates a new line processor.
 func NewProcessor(r io.Reader, w io.Writer, f func([]byte) ([]byte, error)) *Processor {
 	return &Processor{
-		BatchSize:  1000,
+		BatchSize:  100,
 		NumWorkers: runtime.NumCPU(),
 		R:          r,
 		W:          w,
