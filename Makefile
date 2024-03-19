@@ -1,6 +1,6 @@
 SHELL = /bin/bash
 
-uppercase: examples/uppercase.go
+uppercase: examples/uppercase/uppercase.go
 	go build -o $@ $<
 
 fixtures/large.ldj:
