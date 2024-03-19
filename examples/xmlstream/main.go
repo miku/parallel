@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/xml"
 	"flag"
-	"io"
 	"log"
 	"os"
 	"runtime/pprof"
@@ -24,73 +23,6 @@ var bufPool = sync.Pool{
 	},
 }
 
-type TagSplitter struct {
-	tag       []byte       // XML tag to split on
-	opening   []byte       // the opening tag to look for
-	closing   []byte       // the closing tag to look for
-	batchSize int          // number of elements to collect in one batch
-	pos       int          // current read position within data
-	in        bool         // whether we are inside the tag or not
-	buf       bytes.Buffer // read buffer
-	count     int          // the number of elements in the buffer so far
-}
-
-func NewTagSplitter(tag string) *TagSplitter {
-	return &TagSplitter{
-		tag:       []byte(tag),
-		opening:   append(append([]byte("<"), []byte(tag)...), []byte(">")...), // TODO: respect namespaces
-		closing:   append(append([]byte("</"), []byte(tag)...), []byte(">")...),
-		batchSize: 100,
-	}
-}
-
-// Split finds elements in the stream and will accumulate them up to a given batch size.
-func (ts *TagSplitter) Split(data []byte, atEOF bool) (advance int, token []byte, err error) {
-	defer func() {
-		ts.pos = 0
-	}()
-	if atEOF {
-		// at the end, just return the rest
-		// TODO: make sure we have a proper end tag (data may be broken)
-		ts.buf.Write(data)
-		return len(data), ts.buf.Bytes(), io.EOF
-	}
-	for {
-		if ts.batchSize == ts.count {
-			ts.count = 0
-			b := ts.buf.Bytes()
-			ts.buf.Reset()
-			return ts.pos, b, nil
-		}
-		if ts.in {
-			v := bytes.Index(data[ts.pos:], ts.closing)
-			if v == -1 {
-				// current tag exceeds data, so write all and exit Split
-				_, _ = ts.buf.Write(data[ts.pos:])
-				return len(data), nil, nil
-			} else {
-				// end tag found, write and increase counter
-				ts.buf.Write(data[ts.pos : ts.pos+v])
-				ts.buf.Write(data[ts.pos+v : ts.pos+v+len(ts.closing)])
-				ts.in = false
-				ts.count++
-				ts.pos = ts.pos + v + len(ts.closing)
-			}
-		} else {
-			// search for the next opening tag
-			v := bytes.Index(data[ts.pos:], ts.opening)
-			if v == -1 {
-				// nothing found in rest of data, move on
-				return len(data), nil, nil
-			} else {
-				// found start tag
-				ts.in = true
-				ts.pos = ts.pos + v
-			}
-		}
-	}
-}
-
 func main() {
 	flag.Parse()
 	if *cpuprofile != "" {
@@ -101,7 +33,7 @@ func main() {
 		pprof.StartCPUProfile(f)
 		defer pprof.StopCPUProfile()
 	}
-	ts := NewTagSplitter("PubmedArticle")
+	ts := record.NewTagSplitter("PubmedArticle")
 	proc := record.NewProcessor(os.Stdin, os.Stdout, func(p []byte) ([]byte, error) {
 		// setup new xml streaming scanner
 		r := bytes.NewReader(p)
