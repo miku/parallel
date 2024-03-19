@@ -43,10 +43,11 @@ func (p *Processor) Split(f bufio.SplitFunc) {
 func (p *Processor) Run() error {
 	// wErr signals a worker or writer error. If an error occurs, the items in
 	// the queue are still process, just no items are added to the queue. There
-	// is only one way to toggle this, from false to true, so we don't care
+	// is only one way to toggle this, from nil to non-nil, so we don't care
 	// about synchronisation.
 	var wErr error
-	// worker takes []byte batches from a channel queue, executes f and sends the result to the out channel.
+	// worker takes []byte batches from a channel queue, executes f and sends
+	// the result to the out channel.
 	worker := func(queue chan []byte, out chan []byte, f func([]byte) ([]byte, error), wg *sync.WaitGroup) {
 		defer wg.Done()
 		for batch := range queue {
@@ -57,7 +58,7 @@ func (p *Processor) Run() error {
 			out <- r
 		}
 	}
-	// writer buffers writes.
+	// writer buffers writes
 	writer := func(w io.Writer, bc chan []byte, done chan bool) {
 		bw := bufio.NewWriter(w)
 		for b := range bc {
@@ -74,22 +75,27 @@ func (p *Processor) Run() error {
 		queue = make(chan []byte)
 		out   = make(chan []byte)
 		done  = make(chan bool)
+		wg    sync.WaitGroup
 	)
-	var wg sync.WaitGroup
+	// start worker and writer goroutines
 	go writer(p.W, out, done)
+	wg.Add(p.NumWorkers)
 	for i := 0; i < p.NumWorkers; i++ {
-		wg.Add(1)
 		go worker(queue, out, p.F, &wg)
 	}
+	// setup scanner with custom split function
 	scanner := bufio.NewScanner(p.R)
 	scanner.Split(p.SplitFunc)
 	// batch and number of elements put into batch, we do not distinguish
 	// items; could also limit the size; TODO
-	var buf bytes.Buffer
-	var i int
+	var (
+		buf bytes.Buffer
+		i   int
+	)
 	for scanner.Scan() {
 		if i == p.BatchSize {
-			// To avoid checking on each loop, we only check for worker or write errors here.
+			// To avoid checking on each loop, we only check for worker or
+			// write errors here.
 			if wErr != nil {
 				break
 			}
