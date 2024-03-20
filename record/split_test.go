@@ -136,7 +136,8 @@ func TestSplit(t *testing.T) {
 			result []string
 		)
 		ts.BatchSize = c.batchSize
-		s.Split(ts.Split)
+		// s.Split(ts.Split)
+		s.Split(ts.SplitZ)
 		for s.Scan() {
 			result = append(result, s.Text())
 		}
