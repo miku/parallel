@@ -2,13 +2,21 @@ package record
 
 import (
 	"bytes"
-	"fmt"
+	"errors"
 	"io"
 )
 
 const defaultMaxBytes = 16777216
 
-// TagSplitter splits input on XML elements
+var (
+	ErrTagRequired              = errors.New("tag required")
+	ErrGarbledInput             = errors.New("likely gabled input")
+	ErrNestedTagsNotImplemented = errors.New("nested tags with the same name not implemented yet")
+)
+
+// TagSplitter splits input on XML elements. It will batch content up to
+// approximately MaxBytesApprox bytes. It is guaranteed that each batch
+// contains at least one complete element content.
 type TagSplitter struct {
 	Tag            string
 	MaxBytesApprox uint         // max bytes to read per batch, approximately, 16MB by default
@@ -34,6 +42,9 @@ func (s *TagSplitter) maxBytes() int {
 }
 
 func (s *TagSplitter) Split(data []byte, atEOF bool) (advance int, token []byte, err error) {
+	if s.Tag == "" {
+		return 0, nil, ErrTagRequired
+	}
 	if s.done {
 		return 0, nil, io.EOF
 	}
@@ -52,7 +63,11 @@ func (s *TagSplitter) Split(data []byte, atEOF bool) (advance int, token []byte,
 			if atEOF {
 				s.done = true
 				b := s.batch.Bytes()
-				return len(data), b, nil
+				if len(b) == 0 {
+					return len(data), nil, nil
+				} else {
+					return len(data), b, nil
+				}
 			} else {
 				return len(data), nil, nil
 			}
@@ -61,21 +76,24 @@ func (s *TagSplitter) Split(data []byte, atEOF bool) (advance int, token []byte,
 	return 0, nil, nil
 }
 
-// copyContent reads of a single element from the internal buffer and writes it
-// to the given writer. To determine whether content has been written, check n.
+// copyContent reads of a single element content from the internal buffer and
+// writes it to the given writer. To determine whether content has been
+// written, test for non-zero n.
 func (s *TagSplitter) copyContent(w io.Writer) (n int, err error) {
-	var start = s.indexOpeningTag(s.buf)
-	if start == -1 {
+	var start, end, last int
+	if start = s.indexOpeningTag(s.buf); start == -1 {
 		return 0, nil
 	}
-	var end = s.indexClosingTag(s.buf[start:])
-	if end == -1 {
+	if end = s.indexClosingTag(s.buf); end == -1 {
 		return 0, nil
 	}
-	last := end + len(s.Tag) + 3
+	if end < start {
+		return 0, ErrGarbledInput
+	}
+	last = end + len(s.Tag) + 3
 	// sanity check, TODO: fix this
-	if s.indexOpeningTag(s.buf[start+1:]) != -1 {
-		return 0, fmt.Errorf("nested tags with the same name not implemented yet")
+	if s.indexOpeningTag(s.buf[start+1:end]) != -1 {
+		return 0, ErrNestedTagsNotImplemented
 	}
 	n, err = w.Write(s.buf[start:last])
 	s.buf = s.buf[last:] // TODO: optimize this
@@ -86,7 +104,7 @@ func (s *TagSplitter) copyContent(w io.Writer) (n int, err error) {
 func (s *TagSplitter) indexOpeningTag(data []byte) int {
 	var prefix = "<" + s.Tag
 	var v = bytes.Index(data, []byte(prefix))
-	if len(data) < v+len(prefix) {
+	if len(data) <= v+len(prefix) {
 		return -1
 	}
 	if data[v+len(prefix)] == ' ' || data[v+len(prefix)] == '>' {
@@ -95,6 +113,8 @@ func (s *TagSplitter) indexOpeningTag(data []byte) int {
 	return -1
 }
 
+// indexClosingTag returns the index of the next closing tag in a given byte
+// slice.
 func (s *TagSplitter) indexClosingTag(data []byte) int {
 	return bytes.Index(data, []byte("</"+s.Tag+">"))
 }
