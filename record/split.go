@@ -62,12 +62,10 @@ func (s *TagSplitter) Split(data []byte, atEOF bool) (advance int, token []byte,
 		if n == 0 {
 			if atEOF {
 				s.done = true
-				b := s.batch.Bytes()
-				if len(b) == 0 {
+				if s.batch.Len() == 0 {
 					return len(data), nil, nil
-				} else {
-					return len(data), b, nil
 				}
+				return len(data), s.batch.Bytes(), nil
 			} else {
 				return len(data), nil, nil
 			}

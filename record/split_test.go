@@ -51,6 +51,13 @@ func TestSplit(t *testing.T) {
 			err:                   nil,
 		},
 		{
+			doc:                   "two elements, noise, small batch size",
+			tagSplitter:           &TagSplitter{Tag: "a", MaxBytesApprox: 1},
+			input:                 "<a>1</a><a>2</a><b></b><a>3</a>",
+			expectedResultBatches: []string{"<a>1</a>", "<a>2</a>", "<a>3</a>"},
+			err:                   nil,
+		},
+		{
 			doc:                   "two elements, plus noise",
 			tagSplitter:           &TagSplitter{Tag: "a"},
 			input:                 "<a>1</a>  <a>2</a>   HELLO!",
