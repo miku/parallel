@@ -33,7 +33,7 @@ func main() {
 		pprof.StartCPUProfile(f)
 		defer pprof.StopCPUProfile()
 	}
-	ts := record.NewTagSplitter("PubmedArticle")
+	ts := &record.TagSplitter{Tag: "PubmedArticle"}
 	proc := record.NewProcessor(os.Stdin, os.Stdout, func(p []byte) ([]byte, error) {
 		// setup new xml streaming scanner
 		r := bytes.NewReader(p)
