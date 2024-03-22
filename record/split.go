@@ -8,8 +8,13 @@ import (
 	"sync"
 )
 
-// defaultMaxBytes is the default approximate batch size
-const defaultMaxBytes = 16777216
+const (
+	// defaultMaxBytes is the default approximate batch size
+	defaultMaxBytes = 16777216
+	// internalBufferPruneLimit is the minumum number of bytes kept in the buffer; note
+	// that this limits the size of an XML that can be processed by this routines
+	internalBufferPruneLimit = 1048576
+)
 
 var (
 	ErrTagRequired              = errors.New("tag required")
@@ -77,7 +82,7 @@ func (s *TagSplitter) maxBytes() int {
 func (s *TagSplitter) pruneBuf(data []byte) {
 	// If the data passed is too small, we want to accumulate at least a
 	// certain number of bytes, they could accomodate an XML tag (e.g. 16K).
-	if L := slices.Max([]int{2 * len(data), 16384}); len(s.buf) < L {
+	if L := slices.Max([]int{2 * len(data), internalBufferPruneLimit}); len(s.buf) < L {
 		return
 	}
 	k := int(len(s.buf) / 2)
