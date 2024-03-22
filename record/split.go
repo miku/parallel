@@ -4,16 +4,15 @@ import (
 	"bytes"
 	"errors"
 	"io"
-	"slices"
 	"sync"
 )
 
 const (
 	// defaultMaxBytes is the default approximate batch size
 	defaultMaxBytes = 16777216
-	// internalBufferPruneLimit is the number of bytes kept in the buffer; note
-	// that this limits the size of an XML that can be processed by this
-	// package; TODO(martin): investigate exit on prune
+	// internalBufferPruneLimit is the number of bytes kept in the buffer; this
+	// mostly keep the internal buffer from growing w/o limits when no tag is
+	// found in the stream.
 	internalBufferPruneLimit = 16 * 1024
 )
 
@@ -32,8 +31,8 @@ type TagSplitter struct {
 	// currently (they will cause an error).
 	Tag string
 	// MaxBytesApprox is the approximate number of bytes in a batch. A batch
-	// will always contain at least one element, which may exceed this number
-	// significantly. By default, we use 16M per batch.
+	// will always contain at least one element, which may exceed this number.
+	// By default, we use 16MB per batch.
 	MaxBytesApprox uint
 	// buf is the internal scratch space that is used to find a complete
 	// element. This buffer will grow as large as required to accomodate a tag.
@@ -67,7 +66,8 @@ func (s *TagSplitter) maxBytes() int {
 // (whichever is larger). The byte slice passed to Split is typically "getconf
 // PAGE_SIZE" on Linux.
 //
-// Currently, the median buffer size is about 3K.
+// Currently, the median buffer size while running over pubmed JATS XML is
+// about 3KB.
 //
 //	In [6]: df = pd.read_csv("buffersize.tsv")
 //	In [7]: df.describe()
@@ -81,9 +81,6 @@ func (s *TagSplitter) maxBytes() int {
 //	50%      3126.000
 //	75%      5048.000
 //	max    289179.000
-//
-// TODO: This method is not used for the moment, making the processing a bit
-// more dependent on valid input.
 func (s *TagSplitter) pruneBuf(data []byte) {
 	// If the data passed is too small, we want to accumulate at least a
 	// certain number of bytes, they could accomodate an XML tag.
@@ -98,6 +95,7 @@ func (s *TagSplitter) pruneBuf(data []byte) {
 	s.buf = s.buf[k:]
 }
 
+// ensureTags set tag values to search for in the stream.
 func (s *TagSplitter) ensureTags() {
 	if len(s.closingTag) == 0 {
 		s.closingTag = []byte("</" + s.Tag + ">")
@@ -125,8 +123,8 @@ func (s *TagSplitter) Split(data []byte, atEOF bool) (advance int, token []byte,
 	})
 	s.buf = append(s.buf, data...)
 	for {
-		// If batch accumulated enough bytes, actually return a token.
 		if s.batch.Len() >= s.maxBytes() {
+			// If batch accumulated enough bytes, actually return a token.
 			b := s.batch.Bytes()
 			s.batch.Reset()
 			return len(data), b, nil
@@ -134,6 +132,7 @@ func (s *TagSplitter) Split(data []byte, atEOF bool) (advance int, token []byte,
 		n, err := s.copyContent(&s.batch)
 		switch {
 		case err == ErrOpenTagNotFound:
+			// Keep the internal buffer from growing.
 			s.pruneBuf(data)
 		case err != nil:
 			return len(data), nil, err
@@ -144,7 +143,7 @@ func (s *TagSplitter) Split(data []byte, atEOF bool) (advance int, token []byte,
 				if s.batch.Len() == 0 {
 					return len(data), nil, nil
 				}
-				// return the rest of the batch, completely
+				// Return the rest of the batch, completely.
 				return len(data), s.batch.Bytes(), nil
 			} else {
 				return len(data), nil, nil
@@ -158,9 +157,6 @@ func (s *TagSplitter) Split(data []byte, atEOF bool) (advance int, token []byte,
 // writes it to the given writer. If no complete element has been found in the
 // internal buffer, zero is returned. This may fail, if the content is invalid
 // XML or if it contains nested tags of the same name.
-//
-// TODO: if we find open and close tags, we can prune exactly; if we not even
-// finding a start tag, we can prune with a heuristic
 func (s *TagSplitter) copyContent(w io.Writer) (n int, err error) {
 	var start, end, last int
 	if start = s.indexOpeningTag(s.buf); start == -1 {
@@ -199,8 +195,11 @@ func (s *TagSplitter) indexOpeningTag(data []byte) int {
 	if u == -1 {
 		return v
 	}
-	return slices.Min([]int{u, v})
-
+	if u < v {
+		return u
+	} else {
+		return v
+	}
 }
 
 // indexClosingTag returns the index of the first closing tag in data or -1.
