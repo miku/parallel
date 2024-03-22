@@ -130,10 +130,11 @@ func (s *TagSplitter) Split(data []byte, atEOF bool) (advance int, token []byte,
 				// return the rest of the batch, completely
 				return len(data), s.batch.Bytes(), nil
 			} else {
+				// we did not make any progress and we are not done yet, try to
+				// prune buffer
+				s.pruneBuf(data)
 				return len(data), nil, nil
 			}
-			// we did not make any progress, try to prune buffer
-			s.pruneBuf(data)
 		}
 	}
 	return 0, nil, nil
