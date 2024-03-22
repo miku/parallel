@@ -167,7 +167,9 @@ func (s *TagSplitter) copyContent(w io.Writer) (n int, err error) {
 // indexOpeningTag returns the index of the first opening tag in data, or -1;
 // cf. https://www.w3.org/TR/REC-xml/#sec-starttags
 func (s *TagSplitter) indexOpeningTag(data []byte) int {
-	// Do not care too much about repetition, the data may well be cached..
+	// TODO: this seems to be a bigger bottleneck
+	// (https://i.imgur.com/fYzN2mq.png) that I originally thought. Average
+	// size of data is about 3K.
 	u := bytes.Index(data, s.openingTag1)
 	v := bytes.Index(data, s.openingTag2)
 	if u == -1 && v == -1 {
