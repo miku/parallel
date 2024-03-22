@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"errors"
 	"io"
+	"slices"
 )
 
 const defaultMaxBytes = 16777216
@@ -25,20 +26,22 @@ type TagSplitter struct {
 	done           bool         // are we done processing
 }
 
-func (s *TagSplitter) openingTag() []byte {
-	return []byte("<" + s.Tag + ">") // or whitespace
-}
-
-func (s *TagSplitter) closingTag() []byte {
-	return []byte("</" + s.Tag + ">")
-}
-
 func (s *TagSplitter) maxBytes() int {
 	if s.MaxBytesApprox == 0 {
 		return defaultMaxBytes
 	} else {
 		return int(s.MaxBytesApprox)
 	}
+}
+
+// pruneBuf shrinks the internal buffer, if possible.
+func (s *TagSplitter) pruneBuf(data []byte) {
+	L := slices.Max([]int{2 * len(data), 16384})
+	if len(s.buf) < L {
+		return
+	}
+	k := int(len(s.buf) / 2)
+	s.buf = s.buf[k:]
 }
 
 func (s *TagSplitter) Split(data []byte, atEOF bool) (advance int, token []byte, err error) {
@@ -59,6 +62,8 @@ func (s *TagSplitter) Split(data []byte, atEOF bool) (advance int, token []byte,
 		if err != nil {
 			return 0, nil, err
 		}
+		// if no content has been found for a few iterations, then drop parts
+		// of the internal buffer
 		if n == 0 {
 			if atEOF {
 				s.done = true
@@ -69,6 +74,8 @@ func (s *TagSplitter) Split(data []byte, atEOF bool) (advance int, token []byte,
 			} else {
 				return len(data), nil, nil
 			}
+			// we did not make any progress, try to prune buffer
+			s.pruneBuf(data)
 		}
 	}
 	return 0, nil, nil
@@ -100,15 +107,13 @@ func (s *TagSplitter) copyContent(w io.Writer) (n int, err error) {
 
 // https://www.w3.org/TR/REC-xml/#sec-starttags
 func (s *TagSplitter) indexOpeningTag(data []byte) int {
-	var prefix = "<" + s.Tag
-	var v = bytes.Index(data, []byte(prefix))
-	if len(data) <= v+len(prefix) {
-		return -1
+	t := "<" + s.Tag + ">"
+	v := bytes.Index(data, []byte(t))
+	if v == -1 {
+		t = "<" + s.Tag + " "
+		v = bytes.Index(data, []byte(t))
 	}
-	if data[v+len(prefix)] == ' ' || data[v+len(prefix)] == '>' {
-		return v
-	}
-	return -1
+	return v
 }
 
 // indexClosingTag returns the index of the next closing tag in a given byte
