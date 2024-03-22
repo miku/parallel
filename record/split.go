@@ -185,5 +185,5 @@ func (s *TagSplitter) indexOpeningTag(data []byte) int {
 // indexClosingTag returns the index of the next closing tag in a given byte
 // slice.
 func (s *TagSplitter) indexClosingTag(data []byte) int {
-	return bytes.Index(data, s.closingTagl)
+	return bytes.Index(data, s.closingTag)
 }
