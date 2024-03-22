@@ -4,11 +4,11 @@ import (
 	"bytes"
 	"errors"
 	"io"
-	"log"
 	"slices"
 	"sync"
 )
 
+// defaultMaxBytes is the default approximate batch size
 const defaultMaxBytes = 16777216
 
 var (
@@ -36,11 +36,12 @@ type TagSplitter struct {
 	batch bytes.Buffer
 	// done signals when there is nothing more to return.
 	done bool
-	// once for initializing the opening and closing tag byte slices
-	once sync.Once
-	// the closing tag to look for (this does not change)
-	closingTag []byte
-	// opening tags variants, e.g. '<a>', and '<a '
+	// once for initializing the opening and closing tag byte slices; the
+	// closing tag to look for (this does not change); opening tags variants,
+	// e.g. '<a>', and '<a '; previously, these were assembled as needed, but
+	// it may help a tiny bit to not recompute them all the time.
+	once        sync.Once
+	closingTag  []byte
 	openingTag1 []byte
 	openingTag2 []byte
 }
@@ -103,13 +104,14 @@ func (s *TagSplitter) Split(data []byte, atEOF bool) (advance int, token []byte,
 		return 0, nil, ErrTagRequired
 	}
 	if s.done {
-		return 0, nil, io.EOF
+		return len(data), nil, io.EOF
 	}
 	s.once.Do(func() {
 		s.ensureTags()
 	})
 	s.buf = append(s.buf, data...)
 	for {
+		// If batch accumulated enough bytes, actually return a token.
 		if s.batch.Len() >= s.maxBytes() {
 			b := s.batch.Bytes()
 			s.batch.Reset()
@@ -119,8 +121,6 @@ func (s *TagSplitter) Split(data []byte, atEOF bool) (advance int, token []byte,
 		if err != nil {
 			return 0, nil, err
 		}
-		// if no content has been found for a few iterations, then drop parts
-		// of the internal buffer
 		if n == 0 {
 			if atEOF {
 				s.done = true
@@ -139,9 +139,10 @@ func (s *TagSplitter) Split(data []byte, atEOF bool) (advance int, token []byte,
 	return 0, nil, nil
 }
 
-// copyContent reads of a single element content from the internal buffer and
-// writes it to the given writer. To determine whether content has been
-// written, test for non-zero n.
+// copyContent reads at most one element content from the internal buffer and
+// writes it to the given writer. If no complete element has been found in the
+// internal buffer, zero is returned. This may fail, if the content is invalid
+// XML or if it contains nested tags of the same name.
 func (s *TagSplitter) copyContent(w io.Writer) (n int, err error) {
 	var start, end, last int
 	if start = s.indexOpeningTag(s.buf); start == -1 {
@@ -151,7 +152,6 @@ func (s *TagSplitter) copyContent(w io.Writer) (n int, err error) {
 		return 0, nil
 	}
 	if end < start {
-		log.Printf("'%s' | %d %d", s.buf, start, end)
 		return 0, ErrGarbledInput
 	}
 	last = end + len(s.Tag) + 3
@@ -164,7 +164,8 @@ func (s *TagSplitter) copyContent(w io.Writer) (n int, err error) {
 	return
 }
 
-// https://www.w3.org/TR/REC-xml/#sec-starttags
+// indexOpeningTag returns the index of the first opening tag in data, or -1;
+// cf. https://www.w3.org/TR/REC-xml/#sec-starttags
 func (s *TagSplitter) indexOpeningTag(data []byte) int {
 	// Do not care too much about repetition, the data may well be cached..
 	u := bytes.Index(data, s.openingTag1)
@@ -182,8 +183,7 @@ func (s *TagSplitter) indexOpeningTag(data []byte) int {
 
 }
 
-// indexClosingTag returns the index of the next closing tag in a given byte
-// slice.
+// indexClosingTag returns the index of the first closing tag in data or -1.
 func (s *TagSplitter) indexClosingTag(data []byte) int {
 	return bytes.Index(data, s.closingTag)
 }

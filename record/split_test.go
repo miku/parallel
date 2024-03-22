@@ -78,6 +78,20 @@ func TestSplit(t *testing.T) {
 			expectedResultBatches: []string{`<a x="1">1</a><a>2</a>`},
 			err:                   nil,
 		},
+		{
+			doc:                   "garbled input 1",
+			tagSplitter:           &TagSplitter{Tag: "a"},
+			input:                 `<a|`,
+			expectedResultBatches: nil,
+			err:                   nil,
+		},
+		{
+			doc:                   "garbled input 2",
+			tagSplitter:           &TagSplitter{Tag: "a"},
+			input:                 `</a>...<a>`,
+			expectedResultBatches: nil,
+			err:                   ErrGarbledInput,
+		},
 	}
 	for _, c := range cases {
 		s := bufio.NewScanner(strings.NewReader(c.input))
