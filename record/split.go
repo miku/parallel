@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"errors"
 	"io"
+	"log"
 	"slices"
 )
 
@@ -36,8 +37,11 @@ func (s *TagSplitter) maxBytes() int {
 
 // pruneBuf shrinks the internal buffer, if possible.
 func (s *TagSplitter) pruneBuf(data []byte) {
-	L := slices.Max([]int{2 * len(data), 16384})
-	if len(s.buf) < L {
+	// We want the internal buffer to be at least twice the size of the data
+	// buffer, as a tag may just be on a boundary, so 2 * len(data). If the
+	// data passed is too small, we want to accumulate at least a certain
+	// number of bytes, they could accomodate an XML tag (e.g. 16K).
+	if L := slices.Max([]int{2 * len(data), 16384}); len(s.buf) < L {
 		return
 	}
 	k := int(len(s.buf) / 2)
@@ -93,6 +97,7 @@ func (s *TagSplitter) copyContent(w io.Writer) (n int, err error) {
 		return 0, nil
 	}
 	if end < start {
+		log.Printf("'%s' | %d %d", s.buf, start, end)
 		return 0, ErrGarbledInput
 	}
 	last = end + len(s.Tag) + 3
@@ -107,13 +112,19 @@ func (s *TagSplitter) copyContent(w io.Writer) (n int, err error) {
 
 // https://www.w3.org/TR/REC-xml/#sec-starttags
 func (s *TagSplitter) indexOpeningTag(data []byte) int {
-	t := "<" + s.Tag + ">"
-	v := bytes.Index(data, []byte(t))
-	if v == -1 {
-		t = "<" + s.Tag + " "
-		v = bytes.Index(data, []byte(t))
+	u := bytes.Index(data, []byte("<"+s.Tag+">"))
+	v := bytes.Index(data, []byte("<"+s.Tag+" "))
+	if u == -1 && v == -1 {
+		return -1
 	}
-	return v
+	if v == -1 {
+		return u
+	}
+	if u == -1 {
+		return v
+	}
+	return slices.Min([]int{u, v})
+
 }
 
 // indexClosingTag returns the index of the next closing tag in a given byte

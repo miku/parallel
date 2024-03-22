@@ -64,6 +64,20 @@ func TestSplit(t *testing.T) {
 			expectedResultBatches: []string{"<a>1</a><a>2</a>"},
 			err:                   nil,
 		},
+		{
+			doc:                   "prefix matches",
+			tagSplitter:           &TagSplitter{Tag: "a"},
+			input:                 "<aa>1</aa>  <a>2</a>   HELLO!",
+			expectedResultBatches: []string{"<a>2</a>"},
+			err:                   nil,
+		},
+		{
+			doc:                   "tag with attributes",
+			tagSplitter:           &TagSplitter{Tag: "a"},
+			input:                 `<a x="1">1</a>  <a>2</a>   HELLO!`,
+			expectedResultBatches: []string{`<a x="1">1</a><a>2</a>`},
+			err:                   nil,
+		},
 	}
 	for _, c := range cases {
 		s := bufio.NewScanner(strings.NewReader(c.input))
