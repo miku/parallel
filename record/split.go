@@ -13,7 +13,8 @@ const (
 	// internalBufferPruneLimit is the number of bytes kept in the buffer; this
 	// mostly keep the internal buffer from growing w/o limits when no tag is
 	// found in the stream.
-	internalBufferPruneLimit = 16 * 1024
+	internalBufferPruneLimit = 16 * 1024          // 16MB
+	maxBufSize               = 1024 * 1024 * 1024 // 1GB
 )
 
 var (
@@ -21,6 +22,7 @@ var (
 	ErrGarbledInput             = errors.New("likely gabled input")
 	ErrNestedTagsNotImplemented = errors.New("nested tags with the same name not implemented yet")
 	ErrOpenTagNotFound          = errors.New("open tag not found")
+	ErrMaxBufSizeExceeded       = errors.New("max buf size exceeded (data may not be valid xml)")
 )
 
 // TagSplitter splits input on XML elements. It will batch content up to
@@ -124,7 +126,7 @@ func (s *TagSplitter) Split(data []byte, atEOF bool) (advance int, token []byte,
 	s.buf = append(s.buf, data...)
 	for {
 		if s.batch.Len() >= s.maxBytes() {
-			// If batch accumulated enough bytes, actually return a token.
+			// Return token, if we hit batch threshold.
 			b := s.batch.Bytes()
 			s.batch.Reset()
 			return len(data), b, nil
@@ -132,7 +134,9 @@ func (s *TagSplitter) Split(data []byte, atEOF bool) (advance int, token []byte,
 		n, err := s.copyContent(&s.batch)
 		switch {
 		case err == ErrOpenTagNotFound:
-			// Keep the internal buffer from growing.
+			// Keep the internal buffer from growing, but only if we do not
+			// find an opening tag. Searching for a closing tag means we are
+			// inside a tag and we may want to search on.
 			s.pruneBuf(data)
 		case err != nil:
 			return len(data), nil, err
@@ -158,6 +162,9 @@ func (s *TagSplitter) Split(data []byte, atEOF bool) (advance int, token []byte,
 // internal buffer, zero is returned. This may fail, if the content is invalid
 // XML or if it contains nested tags of the same name.
 func (s *TagSplitter) copyContent(w io.Writer) (n int, err error) {
+	if len(s.buf) > maxBufSize {
+		return 0, ErrMaxBufSizeExceeded
+	}
 	var start, end, last int
 	if start = s.indexOpeningTag(s.buf); start == -1 {
 		return 0, ErrOpenTagNotFound
