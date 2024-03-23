@@ -1,9 +1,9 @@
 # parallel
 
-Process lines in parallel.
+Process lines or records in parallel.
 
-This package helps to increase the performance of command line applications,
-that transform data and where data is read in a mostly line orientied fashion.
+This package helps to increase the performance of command line filters, that
+transform data and where data is read in a line or record oriented fashion.
 
 Note: The *order* of the input lines is not preserved in the output.
 
@@ -18,7 +18,7 @@ any specific format, so the input may be plain lines, CSV, newline delimited
 JSON or similar line oriented formats. The output is just bytes and can again
 assume any format.
 
-An example for a simple transformation that does nothing:
+An example for the identity transform:
 
 ```go
 func Noop(b []byte) ([]byte, error) {
@@ -35,53 +35,8 @@ if err := p.Run(); err != nil {
 }
 ```
 
-That's all the setup needed. For details and self contained programs, see [examples](https://github.com/miku/parallel/tree/master/examples).
-
-The processer expects a
-[parallel.TransformerFunc](https://github.com/miku/parallel/blob/fa00b8c221050cc7a84a666f124c9a8c9f0cd471/processor.go#L56-L58).
-There are some functions, that take a byte slice and and return a byte slice,
-but do not return an error (an example would be [bytes.ToUpper](https://golang.org/pkg/bytes/#ToUpper)). These functions can be turned into a TransformerFunc with a simple [helper](https://github.com/miku/parallel/blob/fa00b8c221050cc7a84a666f124c9a8c9f0cd471/processor.go#L60-L66):
-
-```go
-p := parallel.NewProcessor(os.Stdin, os.Stdout, parallel.ToTransformerFunc(bytes.ToUpper))
-if err := p.Run(); err != nil {
-	log.Fatal(err)
-}
-```
-
-## Full Example
-
-```go
-// Uppercases each line. Order of lines is not preserved.
-//
-//     $ printf "hello\nhi\n" | go run examples/uppercase.go
-//     HELLO
-//     HI
-
-package main
-
-import (
-	"bytes"
-	"log"
-	"os"
-
-	"github.com/miku/parallel"
-)
-
-func main() {
-	// Setup input, output and business logic.
-	p := parallel.NewProcessor(os.Stdin, os.Stdout, func(b []byte) ([]byte, error) {
-		return bytes.ToUpper(b), nil
-	})
-
-	// Start processing with parallel workers.
-	if err := p.Run(); err != nil {
-		log.Fatal(err)
-	}
-}
-```
-
-* More examples: https://github.com/miku/parallel/tree/master/examples
+That's all the setup needed. For details and self contained programs, see
+[examples](https://github.com/miku/parallel/tree/master/examples).
 
 # Adjusting the processor
 
@@ -100,23 +55,29 @@ if err := p.Run(); err != nil {
 }
 ```
 
-The default should be ok for a lot of use cases. Batches are kept in memory, so
+The defaults should work for most cases. Batches are kept in memory, so
 higher batch sizes will need more memory but will decrease the coordination
 overhead. Sometimes, a batch size of one can be [useful
 too](https://github.com/miku/parallel/blob/fa00b8c221050cc7a84a666f124c9a8c9f0cd471/examples/fetchall.go#L166).
 
-# Experimental arbitrary record support
+# Record support
 
-[split_test.go](https://github.com/miku/parallel/blob/master/record/split_test.go)
-contains an examples of how to use a
-[bufio.SplitFunc](https://pkg.go.dev/bufio#SplitFunc) to separate records. The
-original `parallel` implementation only looked at **lines** (akin to
-[bufio.ScanLines](https://pkg.go.dev/bufio#ScanLines)), but there are other
-potential use cases, such as parallel parsing of XML.
+It is possible to parallelize record oriented data, too. There is a
+[record.Processor](https://github.com/miku/parallel/blob/11f067737e71ef854339f14b25b83c2194234311/record/record.go#L25-L35)
+additionally takes a
+[Split](https://github.com/miku/parallel/blob/11f067737e71ef854339f14b25b83c2194234311/record/record.go#L37-L40)
+function, that is passed internally to a
+[bufio.Scanner](https://pkg.go.dev/bufio#Scanner), which will parse the input
+and will concatenate a number of records into a batch, which is then passed to
+the conversion function.
 
-Full example of parallel XML parsing (requires lots of RAM, currently):
-[examples/xmlstream/main.go](https://github.com/miku/parallel/blob/master/examples/xmlstream/main.go),
-but can process about 3.4M complex XML docs/min (on a 32-core machine).
+The [bufio](https://pkg.go.dev/bufio) package contains a number of split
+functions, like [ScanWords](https://pkg.go.dev/bufio#ScanWords) and others.
+Originally, we implemented record support for fast XML processing. For that, we
+added a
+[TagSplitter](https://github.com/miku/parallel/blob/11f067737e71ef854339f14b25b83c2194234311/record/split.go#L28-L55)
+which can split input on XML tags.
+
 
 # Random performance data point
 
