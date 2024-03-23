@@ -4,12 +4,14 @@ package record
 import (
 	"bufio"
 	"bytes"
+	"fmt"
 	"io"
 	"runtime"
 	"sync"
 )
 
-// Processor can process lines in parallel.
+// Processor can process records in parallel. Records can be specified by a
+// split function that is used internally by a bufio.Scanner.
 type Processor struct {
 	BatchSize  int
 	SplitFunc  bufio.SplitFunc
@@ -20,11 +22,12 @@ type Processor struct {
 	F          func([]byte) ([]byte, error)
 }
 
-// NewProcessor creates a new line processor.
+// NewProcessor creates a new record processor.
 func NewProcessor(r io.Reader, w io.Writer, f func([]byte) ([]byte, error)) *Processor {
 	return &Processor{
 		BatchSize:  100,
 		NumWorkers: runtime.NumCPU(),
+		SplitFunc:  bufio.ScanLines,
 		R:          r,
 		W:          w,
 		F:          f,
@@ -82,9 +85,10 @@ func (p *Processor) Run() error {
 	}
 	// setup scanner with custom split function
 	scanner := bufio.NewScanner(p.R)
+	if p.SplitFunc == nil {
+		return fmt.Errorf("split function required")
+	}
 	scanner.Split(p.SplitFunc)
-	// batch and number of elements put into batch, we do not distinguish
-	// items; could also limit the size; TODO
 	var (
 		buf bytes.Buffer
 		i   int

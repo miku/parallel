@@ -83,7 +83,7 @@ func (s *TagSplitter) maxBytes() int {
 //	max    289179.000
 func (s *TagSplitter) pruneBuf(data []byte) {
 	// If the data passed is too small, we want to accumulate at least a
-	// certain number of bytes, they could accomodate an XML tag.
+	// certain number of bytes, so they could accomodate an XML tag.
 	L := 2 * len(data)
 	if internalBufferPruneLimit > L {
 		L = internalBufferPruneLimit
