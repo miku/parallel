@@ -11,48 +11,6 @@ import (
 	"time"
 )
 
-// Version of library.
-const Version = "0.1.3"
-
-// BytesBatch is a slice of byte slices.
-type BytesBatch struct {
-	b [][]byte
-}
-
-// NewBytesBatch creates a new BytesBatch with a given capacity.
-func NewBytesBatch() *BytesBatch {
-	return NewBytesBatchCapacity(0)
-}
-
-// NewBytesBatchCapacity creates a new BytesBatch with a given capacity.
-func NewBytesBatchCapacity(cap int) *BytesBatch {
-	return &BytesBatch{b: make([][]byte, 0, cap)}
-}
-
-// Add adds an element to the batch.
-func (bb *BytesBatch) Add(b []byte) {
-	bb.b = append(bb.b, b)
-}
-
-// Reset empties this batch.
-func (bb *BytesBatch) Reset() {
-	bb.b = nil
-}
-
-// Size returns the number of elements in the batch.
-func (bb *BytesBatch) Size() int {
-	return len(bb.b)
-}
-
-// Slice returns a slice of byte slices.
-func (bb *BytesBatch) Slice() [][]byte {
-	b := make([][]byte, len(bb.b))
-	for i := 0; i < len(bb.b); i++ {
-		b[i] = bb.b[i]
-	}
-	return b
-}
-
 // SimpleTransformerFunc converts bytes to bytes.
 type SimpleTransformerFunc func([]byte) []byte
 
@@ -109,7 +67,8 @@ func (p *Processor) Run() error {
 	// is only one way to toggle this, from false to true, so we don't care
 	// about synchronisation.
 	var wErr error
-	// worker takes []byte batches from a channel queue, executes f and sends the result to the out channel.
+	// worker takes []byte batches from a channel queue, executes f and sends
+	// the result to the out channel.
 	worker := func(queue chan [][]byte, out chan []byte, f TransformerFunc, wg *sync.WaitGroup) {
 		defer wg.Done()
 		for batch := range queue {
@@ -141,8 +100,8 @@ func (p *Processor) Run() error {
 		done    = make(chan bool)
 		total   int64
 		started = time.Now()
+		wg      sync.WaitGroup
 	)
-	var wg sync.WaitGroup
 	go writer(p.W, out, done)
 	for i := 0; i < p.NumWorkers; i++ {
 		wg.Add(1)
@@ -164,10 +123,12 @@ func (p *Processor) Run() error {
 		batch.Add(b)
 		if batch.Size() == p.BatchSize {
 			if p.Verbose {
-				log.Printf("parallel: dispatched %d lines (%0.2f lines/s)", total, float64(total)/time.Since(started).Seconds())
+				log.Printf("parallel: dispatched %d lines (%0.2f lines/s)",
+					total, float64(total)/time.Since(started).Seconds())
 			}
 			total += int64(p.BatchSize)
-			// To avoid checking on each loop, we only check for worker or write errors here.
+			// To avoid checking on each loop, we only check for worker or
+			// write errors here.
 			if wErr != nil {
 				break
 			}
