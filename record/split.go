@@ -13,28 +13,28 @@ const (
 	// internalBufferPruneLimit is the number of bytes kept in the buffer; this
 	// mostly keep the internal buffer from growing w/o limits when no tag is
 	// found in the stream.
-	internalBufferPruneLimit = 16 * 1024          // 16MB
-	maxBufSize               = 1024 * 1024 * 1024 // 1GB
+	internalBufferPruneLimit = 16384      // bytes
+	maxBufSize               = 1073741824 // 1GB (please send me real-world XML where an element exceeds 1GB -- I think they exist)
 )
 
 var (
 	ErrTagRequired              = errors.New("tag required")
 	ErrGarbledInput             = errors.New("likely gabled input")
 	ErrNestedTagsNotImplemented = errors.New("nested tags with the same name not implemented yet")
-	ErrOpenTagNotFound          = errors.New("open tag not found")
 	ErrMaxBufSizeExceeded       = errors.New("max buf size exceeded (data may not be valid xml)")
+
+	errOpenTagNotFound = errors.New("open tag not found")
 )
 
 // TagSplitter splits input on XML elements. It will batch content up to
 // approximately MaxBytesApprox bytes. It is guaranteed that each batch
 // contains at least one complete element content.
 type TagSplitter struct {
-	// Tag to split on. Nested tags with the same name are not supperted
+	// Tag to split on. Nested tags with the same name are not supported
 	// currently (they will cause an error).
 	Tag string
 	// MaxBytesApprox is the approximate number of bytes in a batch. A batch
 	// will always contain at least one element, which may exceed this number.
-	// By default, we use 16MB per batch.
 	MaxBytesApprox uint
 	// buf is the internal scratch space that is used to find a complete
 	// element. This buffer will grow as large as required to accomodate a tag.
@@ -133,7 +133,7 @@ func (s *TagSplitter) Split(data []byte, atEOF bool) (advance int, token []byte,
 		}
 		n, err := s.copyContent(&s.batch)
 		switch {
-		case err == ErrOpenTagNotFound:
+		case err == errOpenTagNotFound:
 			// Keep the internal buffer from growing, but only if we do not
 			// find an opening tag. Searching for a closing tag means we are
 			// inside a tag and we may want to search on.
@@ -167,7 +167,7 @@ func (s *TagSplitter) copyContent(w io.Writer) (n int, err error) {
 	}
 	var start, end, last int
 	if start = s.indexOpeningTag(s.buf); start == -1 {
-		return 0, ErrOpenTagNotFound
+		return 0, errOpenTagNotFound
 	}
 	if end = s.indexClosingTag(s.buf); end == -1 {
 		return 0, nil
@@ -176,7 +176,6 @@ func (s *TagSplitter) copyContent(w io.Writer) (n int, err error) {
 		return 0, ErrGarbledInput
 	}
 	last = end + len(s.Tag) + 3
-	// sanity check, TODO: fix this w/ a stack
 	if s.indexOpeningTag(s.buf[start+1:end]) != -1 {
 		return 0, ErrNestedTagsNotImplemented
 	}
@@ -212,4 +211,12 @@ func (s *TagSplitter) indexOpeningTag(data []byte) int {
 // indexClosingTag returns the index of the first closing tag in data or -1.
 func (s *TagSplitter) indexClosingTag(data []byte) int {
 	return bytes.Index(data, s.closingTag)
+}
+
+func (s *TagSplitter) countOpeningTags(data []byte) int {
+	return bytes.Count(data, s.openingTag1) + bytes.Count(data, s.openingTag2)
+}
+
+func (s *TagSplitter) countClosingTags(data []byte) int {
+	return bytes.Count(data, s.closingTag)
 }
