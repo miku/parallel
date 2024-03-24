@@ -92,6 +92,13 @@ func TestSplit(t *testing.T) {
 			expectedResultBatches: nil,
 			err:                   ErrGarbledInput,
 		},
+		{
+			doc:                   "tag missing",
+			tagSplitter:           &TagSplitter{},
+			input:                 `</a>...<a>`,
+			expectedResultBatches: nil,
+			err:                   ErrTagRequired,
+		},
 	}
 	for _, c := range cases {
 		s := bufio.NewScanner(strings.NewReader(c.input))

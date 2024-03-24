@@ -154,13 +154,13 @@ func (s *TagSplitter) Split(data []byte, atEOF bool) (advance int, token []byte,
 			}
 		}
 	}
-	return 0, nil, nil
 }
 
 // copyContent reads at most one element content from the internal buffer and
-// writes it to the given writer. If no complete element has been found in the
-// internal buffer, zero is returned. This may fail, if the content is invalid
-// XML or if it contains nested tags of the same name.
+// writes it to the given writer. Returns the number of bytes read, e.g. zero
+// if no complete element has been found in the internal buffer. This may fail
+// on invalid XML, if a single element size exceeds a limit or as a current
+// restriction, if data contains nested tags of the same name.
 func (s *TagSplitter) copyContent(w io.Writer) (n int, err error) {
 	if len(s.buf) > maxBufSize {
 		return 0, ErrMaxBufSizeExceeded

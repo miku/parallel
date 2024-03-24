@@ -33,8 +33,6 @@ func (bb *BytesBatch) Size() int {
 // Slice returns a slice of byte slices.
 func (bb *BytesBatch) Slice() [][]byte {
 	b := make([][]byte, len(bb.b))
-	for i := 0; i < len(bb.b); i++ {
-		b[i] = bb.b[i]
-	}
+	copy(b, bb.b)
 	return b
 }
