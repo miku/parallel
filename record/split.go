@@ -36,6 +36,7 @@ type TagSplitter struct {
 	// MaxBytesApprox is the approximate number of bytes in a batch. A batch
 	// will always contain at least one element, which may exceed this number.
 	MaxBytesApprox uint
+
 	// buf is the internal scratch space that is used to find a complete
 	// element. This buffer will grow as large as required to accomodate a tag.
 	buf []byte
@@ -195,13 +196,7 @@ func (s *TagSplitter) indexOpeningTag(data []byte) int {
 	if u == -1 && v == -1 {
 		return -1
 	}
-	if v == -1 {
-		return u
-	}
-	if u == -1 {
-		return v
-	}
-	if u < v {
+	if v == -1 || u < v {
 		return u
 	} else {
 		return v
@@ -211,12 +206,4 @@ func (s *TagSplitter) indexOpeningTag(data []byte) int {
 // indexClosingTag returns the index of the first closing tag in data or -1.
 func (s *TagSplitter) indexClosingTag(data []byte) int {
 	return bytes.Index(data, s.closingTag)
-}
-
-func (s *TagSplitter) countOpeningTags(data []byte) int {
-	return bytes.Count(data, s.openingTag1) + bytes.Count(data, s.openingTag2)
-}
-
-func (s *TagSplitter) countClosingTags(data []byte) int {
-	return bytes.Count(data, s.closingTag)
 }
