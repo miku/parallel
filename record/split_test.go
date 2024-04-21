@@ -99,6 +99,13 @@ func TestSplit(t *testing.T) {
 			expectedResultBatches: nil,
 			err:                   ErrTagRequired,
 		},
+		{
+			doc:                   "nested elements",
+			tagSplitter:           &TagSplitter{Tag: "a"},
+			input:                 `<a><a></a></a>`,
+			expectedResultBatches: []string{`<a><a></a></a>`},
+			err:                   nil,
+		},
 	}
 	for _, c := range cases {
 		s := bufio.NewScanner(strings.NewReader(c.input))
