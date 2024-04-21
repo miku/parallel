@@ -117,39 +117,28 @@ func TestSplit(t *testing.T) {
 	}
 }
 
-func TestIndexXTag(t *testing.T) {
-	var cases = []struct {
-		s               *TagSplitter
-		data            []byte
-		openingTagIndex int
-		closingTagIndex int
-	}{
-		{
-			s: &TagSplitter{
-				Tag: "a",
-			},
-			data:            []byte("none"),
-			openingTagIndex: -1,
-			closingTagIndex: -1,
-		},
-		{
-			s: &TagSplitter{
-				Tag: "a",
-			},
-			data:            []byte("hello <a> world </a>"),
-			openingTagIndex: 6,
-			closingTagIndex: 16,
-		},
-	}
-	for _, c := range cases {
-		c.s.ensureTags() // use private, leak private
-		ot := c.s.indexOpeningTag(c.data)
-		if ot != c.openingTagIndex {
-			t.Fatalf("got %v, want %v", ot, c.openingTagIndex)
-		}
-		ct := c.s.indexClosingTag(c.data)
-		if ct != c.closingTagIndex {
-			t.Fatalf("got %v, want %v", ct, c.closingTagIndex)
+func BenchmarkTagSplitter(b *testing.B) {
+	data := `
+	....................<a>................
+	.......................................
+	..............<a></a>..................
+	.......................................
+	.......................................
+	.......................................
+	<a>...</a>...............<a>....</a>...
+	.......................................
+	.......................................
+	.......................................
+	...................................</a>
+	`
+	ts := TagSplitter{Tag: "a", MaxBytesApprox: 8}
+	s := bufio.NewScanner(strings.NewReader(data))
+	s.Split(ts.Split)
+	for n := 0; n < b.N; n++ {
+		var count int
+		for s.Scan() {
+			_ = s.Text()
+			count++
 		}
 	}
 }

@@ -3,7 +3,9 @@ package record
 import (
 	"bytes"
 	"errors"
+	"index/suffixarray"
 	"io"
+	"sort"
 	"sync"
 )
 
@@ -160,50 +162,71 @@ func (s *TagSplitter) Split(data []byte, atEOF bool) (advance int, token []byte,
 // copyContent reads at most one element content from the internal buffer and
 // writes it to the given writer. Returns the number of bytes read, e.g. zero
 // if no complete element has been found in the internal buffer. This may fail
-// on invalid XML, if a single element size exceeds a limit or as a current
-// restriction, if data contains nested tags of the same name.
+// on invalid XML or very large XML elements.
 func (s *TagSplitter) copyContent(w io.Writer) (n int, err error) {
 	if len(s.buf) > maxBufSize {
 		return 0, ErrMaxBufSizeExceeded
 	}
-	var start, end, last int
-	if start = s.indexOpeningTag(s.buf); start == -1 {
+	index := suffixarray.New(s.buf)
+	// We can treat both tags the same, as they have the same length,
+	// accidentally.
+	ot1 := index.Lookup(s.openingTag1, -1)
+	ot2 := index.Lookup(s.openingTag2, -1)
+	openingTagIndices := append(ot1, ot2...)
+	if len(openingTagIndices) == 0 {
 		return 0, errOpenTagNotFound
 	}
-	if end = s.indexClosingTag(s.buf); end == -1 {
+	closingTagIndices := index.Lookup(s.closingTag, -1)
+	if len(closingTagIndices) == 0 {
 		return 0, nil
 	}
-	if end < start {
-		return 0, ErrGarbledInput
-	}
-	last = end + len(s.Tag) + 3
-	if s.indexOpeningTag(s.buf[start+1:end]) != -1 {
-		return 0, ErrNestedTagsNotImplemented
+	var start, end, last int
+	if len(openingTagIndices) == 1 && len(closingTagIndices) == 1 {
+		start = openingTagIndices[0]
+		end = closingTagIndices[0]
+		if end < start {
+			return 0, ErrGarbledInput
+		}
+		last = end + len(s.Tag) + 3 // TODO: assumes </...>
+	} else {
+		sort.Ints(openingTagIndices)
+		sort.Ints(closingTagIndices)
+		start, end = findMatchingTags(openingTagIndices, closingTagIndices)
+		if end < start {
+			return 0, ErrGarbledInput
+		}
+		if start == -1 {
+			// no matching tag found
+			return 0, nil
+		}
+		last = end + len(s.Tag) + 3 // TODO: assumes </...>
 	}
 	n, err = w.Write(s.buf[start:last])
 	s.buf = s.buf[last:] // TODO: optimize this, ringbuffer?
 	return
 }
 
-// indexOpeningTag returns the index of the first opening tag in data, or -1;
-// cf. https://www.w3.org/TR/REC-xml/#sec-starttags
-func (s *TagSplitter) indexOpeningTag(data []byte) int {
-	// TODO: this seems to be a bigger bottleneck
-	// (https://i.imgur.com/fYzN2mq.png) that I originally thought. Average
-	// size of data is about 3K.
-	u := bytes.Index(data, s.openingTag1)
-	v := bytes.Index(data, s.openingTag2)
-	if u == -1 && v == -1 {
-		return -1
+// findMatchingTags returns the indices of matching opening and close tags. The
+// opening tag used is always the first one. Returns [-1, -1] if no matching
+// closing tag exists.
+func findMatchingTags(opening []int, closing []int) (int, int) {
+	if len(opening) == 0 || len(closing) == 0 {
+		return -1, -1
 	}
-	if v == -1 || u < v {
-		return u
-	} else {
-		return v
+	var i, j, size int
+	for {
+		if j == len(closing) {
+			return -1, -1
+		}
+		if i < len(opening) && opening[i] < closing[j] {
+			size++
+			i++
+		} else {
+			size--
+			if size == 0 {
+				return opening[0], closing[j]
+			}
+			j++
+		}
 	}
-}
-
-// indexClosingTag returns the index of the first closing tag in data or -1.
-func (s *TagSplitter) indexClosingTag(data []byte) int {
-	return bytes.Index(data, s.closingTag)
 }
