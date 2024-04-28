@@ -67,9 +67,9 @@ func (s *TagSplitter) maxBytes() int {
 }
 
 // pruneBuf shrinks the internal buffer, if possible. The internal buffer shall
-// never be larger than 16K or twice the size of the byte slice passed to Split
-// (whichever is larger). The byte slice passed to Split is typically "getconf
-// PAGE_SIZE" on Linux.
+// not be larger twice the size of the byte slice passed to Split, but at least
+// 16K. The byte slice passed to Split is typically of size "getconf PAGE_SIZE"
+// on Linux.
 //
 // Currently, the median buffer size while running over pubmed JATS XML is
 // about 3KB.
