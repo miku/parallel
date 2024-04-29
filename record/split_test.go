@@ -106,6 +106,13 @@ func TestSplit(t *testing.T) {
 			expectedResultBatches: []string{`<a><a></a></a>`},
 			err:                   nil,
 		},
+		{
+			doc:                   "many elements",
+			tagSplitter:           &TagSplitter{Tag: "a"},
+			input:                 `<a>..</a><a>..</a><a>..</a><a>..</a><a>..</a><a>..</a>`,
+			expectedResultBatches: []string{`<a>..</a><a>..</a><a>..</a><a>..</a><a>..</a><a>..</a>`},
+			err:                   nil,
+		},
 	}
 	for _, c := range cases {
 		s := bufio.NewScanner(strings.NewReader(c.input))
