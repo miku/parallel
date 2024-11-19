@@ -7,8 +7,17 @@ import (
 	"sync"
 )
 
+const defaultBatchSize = 16777216
+
 // Func is a generic processing function.
 type Func func([]byte) ([]byte, error)
+
+var blobPool = sync.Pool{
+	New: func() any {
+		b := make([]byte, defaultBatchSize)
+		return b
+	},
+}
 
 // Result is a processing result. If Err is not nil, a processing error occured
 // and B may be empty.
@@ -19,7 +28,7 @@ type Result struct {
 
 func New(r io.Reader, w io.Writer, f Func) *Proc {
 	proc := &Proc{r: r, w: w, f: f}
-	proc.Size = 16777216
+	proc.Size = 16777216 // 16MB
 	proc.NumWorkers = runtime.NumCPU()
 	return proc
 }
@@ -32,54 +41,68 @@ type Proc struct {
 	f          Func
 	Size       int
 	NumWorkers int
-	batch      chan []byte
+	queue      chan []byte
 	resultC    chan Result
 	done       chan bool
 	wg         sync.WaitGroup
 }
 
+// worker can process a blob of bytes with the given Func.
 func (p *Proc) worker(queue chan []byte, resultC chan Result, wg *sync.WaitGroup) {
 	defer wg.Done()
 	for blob := range queue {
 		b, err := p.f(blob)
-		r := Result{B: b, Err: err}
+		r := Result{
+			B:   b,
+			Err: err,
+		}
 		resultC <- r
+		if err != nil {
+			break
+		}
+		blobPool.Put(blob)
 	}
 }
 
-func (p *P) writer(resultC chan Result, done chan bool) {
+// writer collects results and writes it to the setup write.
+func (p *Proc) writer(resultC chan Result, done chan bool) {
 	for blob := range resultC {
-		p.w.Write(blob)
+		p.w.Write(blob.B)
 	}
 }
 
+// Run start the workers and begins reading and processing data.
 func (p *Proc) Run() error {
 	p.queue = make(chan []byte)
-	p.resultC = make(chan []byte)
+	p.resultC = make(chan Result)
 	p.done = make(chan bool)
-
+	// start workers
 	for i := 0; i < p.NumWorkers; i++ {
 		p.wg.Add(1)
-		go worker(queue, resultC, &wg)
+		go p.worker(p.queue, p.resultC, &p.wg)
 	}
-
 	var (
 		scanner = bufio.NewScanner(p.r)
-		batch   = make([]byte, p.Size)
+		batch   = blobPool.Get().([]byte)
 		i       int
 	)
 	for scanner.Scan() {
 		b := scanner.Bytes()
 		k := i + len(b)
-		if k < len(batch) {
-			_ = copy(batch[i:], b)
-		} else {
-			// pass to goroutine
+		if k > len(batch) {
+			p.queue <- batch
+			batch = blobPool.Get().([]byte)
+			i = 0
 		}
+		_ = copy(batch[i:], b)
 		i = i + len(b)
 	}
 	if err := scanner.Err(); err != nil {
 		return err
 	}
+	close(p.queue)
+	p.wg.Wait()
+	close(p.resultC)
+	<-p.done
 	return nil
 }
