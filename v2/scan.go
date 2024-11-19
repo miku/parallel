@@ -48,15 +48,16 @@ type Proc struct {
 }
 
 // worker can process a blob of bytes with the given Func.
-func (p *Proc) worker(queue chan []byte, resultC chan Result, wg *sync.WaitGroup) {
-	defer wg.Done()
-	for blob := range queue {
+func (p *Proc) worker() {
+	defer p.wg.Done()
+	for blob := range p.queue {
+		// TODO: a fast line splitter, with SWAR, then apply F on each line
 		b, err := p.f(blob)
 		r := Result{
 			B:   b,
 			Err: err,
 		}
-		resultC <- r
+		p.resultC <- r
 		if err != nil {
 			break
 		}
@@ -65,10 +66,11 @@ func (p *Proc) worker(queue chan []byte, resultC chan Result, wg *sync.WaitGroup
 }
 
 // writer collects results and writes it to the setup write.
-func (p *Proc) writer(resultC chan Result, done chan bool) {
-	for blob := range resultC {
+func (p *Proc) writer() {
+	for blob := range p.resultC {
 		p.w.Write(blob.B)
 	}
+	p.done <- true
 }
 
 // Run start the workers and begins reading and processing data.
@@ -79,8 +81,9 @@ func (p *Proc) Run() error {
 	// start workers
 	for i := 0; i < p.NumWorkers; i++ {
 		p.wg.Add(1)
-		go p.worker(p.queue, p.resultC, &p.wg)
+		go p.worker()
 	}
+	go p.writer()
 	var (
 		scanner = bufio.NewScanner(p.r)
 		batch   = blobPool.Get().([]byte)
@@ -100,6 +103,11 @@ func (p *Proc) Run() error {
 	if err := scanner.Err(); err != nil {
 		return err
 	}
+	// process the last batch
+	if len(batch) > 0 {
+		p.queue <- batch
+	}
+	// wrap up workers
 	close(p.queue)
 	p.wg.Wait()
 	close(p.resultC)

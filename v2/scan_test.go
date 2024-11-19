@@ -31,7 +31,11 @@ func TestProc(t *testing.T) {
 			t.Fatalf("got %v, want %v", err, c.Err)
 		}
 		if buf.String() != c.Expected {
-			t.Fatalf("got %v, want %v", buf.String(), c.Expected)
+			t.Fatalf("got %v (%d), want %v (%d)",
+				buf.String(),
+				len(buf.String()),
+				c.Expected,
+				len(c.Expected))
 		}
 	}
 }
