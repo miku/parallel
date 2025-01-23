@@ -14,7 +14,7 @@ type Func func([]byte) ([]byte, error)
 
 var blobPool = sync.Pool{
 	New: func() any {
-		b := make([]byte, defaultBatchSize)
+		b := make([]byte, defaultBatchSize, defaultBatchSize)
 		return b
 	},
 }
@@ -78,12 +78,11 @@ func (p *Proc) Run() error {
 	p.queue = make(chan []byte)
 	p.resultC = make(chan Result)
 	p.done = make(chan bool)
-	// start workers
+	go p.writer()
+	p.wg.Add(p.NumWorkers)
 	for i := 0; i < p.NumWorkers; i++ {
-		p.wg.Add(1)
 		go p.worker()
 	}
-	go p.writer()
 	var (
 		scanner = bufio.NewScanner(p.r)
 		batch   = blobPool.Get().([]byte)
@@ -92,9 +91,10 @@ func (p *Proc) Run() error {
 	for scanner.Scan() {
 		b := scanner.Bytes()
 		k := i + len(b)
-		if k > len(batch) {
-			p.queue <- batch
+		if k > cap(batch) {
+			p.queue <- batch[:i]
 			batch = blobPool.Get().([]byte)
+			batch = batch[:0]
 			i = 0
 		}
 		_ = copy(batch[i:], b)
@@ -103,11 +103,9 @@ func (p *Proc) Run() error {
 	if err := scanner.Err(); err != nil {
 		return err
 	}
-	// process the last batch
 	if len(batch) > 0 {
-		p.queue <- batch
+		p.queue <- batch[:i]
 	}
-	// wrap up workers
 	close(p.queue)
 	p.wg.Wait()
 	close(p.resultC)
