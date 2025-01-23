@@ -22,6 +22,14 @@ func TestProc(t *testing.T) {
 			},
 			Err: nil,
 		},
+		{
+			R:        strings.NewReader("ABC\nABC\nABC\n"),
+			Expected: "ABCABCABC",
+			F: func(p []byte) ([]byte, error) {
+				return p, nil
+			},
+			Err: nil,
+		},
 	}
 	for _, c := range cases {
 		var buf bytes.Buffer

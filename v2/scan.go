@@ -1,3 +1,5 @@
+// Package parallel/v2 implements parallel batch processing of records (e.g.
+// lines) read from a stream.
 package parallel
 
 import (
@@ -61,6 +63,7 @@ func (p *Proc) worker() {
 		if err != nil {
 			break
 		}
+		blob = nil
 		blobPool.Put(blob)
 	}
 }
@@ -91,10 +94,9 @@ func (p *Proc) Run() error {
 	for scanner.Scan() {
 		b := scanner.Bytes()
 		k := i + len(b)
-		if k > cap(batch) {
+		if k > len(batch) {
 			p.queue <- batch[:i]
 			batch = blobPool.Get().([]byte)
-			batch = batch[:0]
 			i = 0
 		}
 		_ = copy(batch[i:], b)
