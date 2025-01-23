@@ -107,14 +107,25 @@ func (p *Proc) worker(ctx context.Context) {
 }
 
 // writer collects results and writes it to the setup write.
-func (p *Proc) writer() {
-	for r := range p.resultC {
-		if r.Err != nil {
-			continue
+func (p *Proc) writer(ctx context.Context) {
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case r, ok := <-p.resultC:
+			if !ok {
+				p.done <- true
+				return
+			}
+			if r.Err != nil {
+				continue
+			}
+			if ctx.Err() != nil {
+				return
+			}
+			_, _ = p.w.Write(r.B)
 		}
-		_, _ = p.w.Write(r.B)
 	}
-	p.done <- true
 }
 
 // Run start the workers and begins reading and processing data.
@@ -122,7 +133,7 @@ func (p *Proc) Run(ctx context.Context) error {
 	p.queue = make(chan []byte)
 	p.resultC = make(chan Result)
 	p.done = make(chan bool)
-	go p.writer()
+	go p.writer(ctx)
 	p.wg.Add(p.NumWorkers)
 	for i := 0; i < p.NumWorkers; i++ {
 		go p.worker(ctx)
