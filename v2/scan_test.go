@@ -3,6 +3,7 @@ package parallel
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"io"
 	"strings"
 	"testing"
@@ -46,5 +47,44 @@ func TestProc(t *testing.T) {
 				c.Expected,
 				len(c.Expected))
 		}
+	}
+}
+
+func TestProcParallel(t *testing.T) {
+	tests := []struct {
+		name    string
+		input   string
+		f       Func
+		wantErr bool
+	}{{
+		name:  "simple passthrough",
+		input: "hello\nworld\n",
+		f: func(b []byte) ([]byte, error) {
+			return b, nil
+		},
+	}, {
+		name:  "worker error",
+		input: "hello\nworld\n",
+		f: func(b []byte) ([]byte, error) {
+			return nil, fmt.Errorf("worker error")
+		},
+		wantErr: true,
+	}}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctx := context.Background()
+			r := strings.NewReader(tt.input)
+			var w bytes.Buffer
+
+			p := New(r, &w, tt.f)
+			err := p.Run(ctx)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("Run [%v]: got %v, want %v",
+					tt.name,
+					err,
+					tt.wantErr)
+			}
+		})
 	}
 }

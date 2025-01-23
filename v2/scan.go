@@ -118,6 +118,12 @@ func (p *Proc) writer(ctx context.Context) {
 	}
 }
 
+func (p *Proc) hasErrors() bool {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	return len(p.errors) > 0
+}
+
 // Run start the workers and begins reading and processing data.
 func (p *Proc) Run(ctx context.Context) error {
 	p.queue = make(chan []byte)
@@ -158,10 +164,7 @@ func (p *Proc) Run(ctx context.Context) error {
 			}
 			_ = copy(batch[i:], b)
 			i = i + len(b)
-			p.mu.Lock()
-			hasErrors := len(p.errors) > 0
-			p.mu.Unlock()
-			if hasErrors {
+			if p.hasErrors() {
 				err = fmt.Errorf("worker errors: %v", p.errors)
 				goto cleanup
 			}
@@ -179,5 +182,8 @@ cleanup:
 	p.wg.Wait()
 	close(p.resultC)
 	<-p.done
+	if p.hasErrors() {
+		return fmt.Errorf("worker errors: %v", p.errors)
+	}
 	return err
 }
