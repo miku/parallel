@@ -5,6 +5,7 @@ package parallel
 import (
 	"bufio"
 	"context"
+	"fmt"
 	"io"
 	"runtime"
 	"sync"
@@ -30,9 +31,13 @@ type Result struct {
 }
 
 func New(r io.Reader, w io.Writer, f Func) *Proc {
-	proc := &Proc{r: r, w: w, f: f}
-	proc.Size = defaultBatchSize // 16MB
-	proc.NumWorkers = runtime.NumCPU()
+	proc := &Proc{
+		r:          r,
+		w:          w,
+		f:          f,
+		Size:       defaultBatchSize,
+		NumWorkers: runtime.NumCPU(),
+	}
 	return proc
 }
 
@@ -78,18 +83,12 @@ func (p *Proc) worker(ctx context.Context) {
 			if !ok {
 				return
 			}
-			defer func() {
-				blob = nil
-				blobPool.Put(blob)
-			}()
 			if ctx.Err() != nil {
+				blobPool.Put(blob)
 				return
 			}
 			b, err := p.f(blob)
-			r := Result{
-				B:   b,
-				Err: err,
-			}
+			r := Result{B: b, Err: err}
 			select {
 			case p.resultC <- r:
 				if err != nil {
@@ -98,9 +97,9 @@ func (p *Proc) worker(ctx context.Context) {
 					p.mu.Unlock()
 				}
 			case <-ctx.Done():
+				blobPool.Put(blob)
 				return
 			}
-			blob = nil
 			blobPool.Put(blob)
 		}
 	}
@@ -108,23 +107,14 @@ func (p *Proc) worker(ctx context.Context) {
 
 // writer collects results and writes it to the setup write.
 func (p *Proc) writer(ctx context.Context) {
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		case r, ok := <-p.resultC:
-			if !ok {
-				p.done <- true
-				return
-			}
-			if r.Err != nil {
-				continue
-			}
-			if ctx.Err() != nil {
-				return
-			}
-			_, _ = p.w.Write(r.B)
+	defer func() {
+		p.done <- true
+	}()
+	for r := range p.resultC {
+		if ctx.Err() != nil || r.Err != nil {
+			continue
 		}
+		_, _ = p.w.Write(r.B)
 	}
 }
 
@@ -142,30 +132,52 @@ func (p *Proc) Run(ctx context.Context) error {
 		scanner = bufio.NewScanner(p.r)
 		batch   = blobPool.Get().([]byte)
 		i       int
+		err     error
 	)
-	for scanner.Scan() {
-		b := scanner.Bytes()
-		k := i + len(b)
-		if k > len(batch) {
-			p.queue <- batch[:i]
-			batch = blobPool.Get().([]byte)
-			i = 0
-		}
-		_ = copy(batch[i:], b)
-		i = i + len(b)
-		if len(p.errors) > 0 {
-			break
+	for {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		default:
+			if !scanner.Scan() {
+				goto cleanup
+			}
+			var (
+				b = scanner.Bytes()
+				k = i + len(b)
+			)
+			if k > len(batch) {
+				select {
+				case p.queue <- batch[:i]:
+					batch = blobPool.Get().([]byte)
+					i = 0
+				case <-ctx.Done():
+					err = ctx.Err()
+					goto cleanup
+				}
+			}
+			_ = copy(batch[i:], b)
+			i = i + len(b)
+			p.mu.Lock()
+			hasErrors := len(p.errors) > 0
+			p.mu.Unlock()
+			if hasErrors {
+				err = fmt.Errorf("worker errors: %v", p.errors)
+				goto cleanup
+			}
 		}
 	}
-	if err := scanner.Err(); err != nil {
-		return err
+cleanup:
+	if err == nil {
+		err = scanner.Err()
 	}
-	if len(batch) > 0 {
+	if i > 0 && batch != nil {
 		p.queue <- batch[:i]
+		batch = nil
 	}
 	close(p.queue)
 	p.wg.Wait()
 	close(p.resultC)
 	<-p.done
-	return nil
+	return err
 }
