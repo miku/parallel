@@ -2,6 +2,7 @@ package parallel
 
 import (
 	"bytes"
+	"context"
 	"io"
 	"strings"
 	"testing"
@@ -34,7 +35,7 @@ func TestProc(t *testing.T) {
 	for _, c := range cases {
 		var buf bytes.Buffer
 		proc := New(c.R, &buf, c.F)
-		err := proc.Run()
+		err := proc.Run(context.Background())
 		if err != c.Err {
 			t.Fatalf("got %v, want %v", err, c.Err)
 		}

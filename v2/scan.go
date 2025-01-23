@@ -4,6 +4,7 @@ package parallel
 
 import (
 	"bufio"
+	"context"
 	"io"
 	"runtime"
 	"sync"
@@ -67,42 +68,41 @@ type Proc struct {
 
 // worker can process a blob of bytes with the given Func. If a processing
 // function returns an error this worker will wind down.
-func (p *Proc) worker(ctx context.Cancel) {
+func (p *Proc) worker(ctx context.Context) {
 	defer p.wg.Done()
-	select {
-	case <-ctx.Done():
-	case blob := <-p.queue:
-		b, err := p.f(blob)
-		r := Result{
-			B:   b,
-			Err: err,
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case blob, ok := <-p.queue:
+			if !ok {
+				return
+			}
+			defer func() {
+				blob = nil
+				blobPool.Put(blob)
+			}()
+			if ctx.Err() != nil {
+				return
+			}
+			b, err := p.f(blob)
+			r := Result{
+				B:   b,
+				Err: err,
+			}
+			select {
+			case p.resultC <- r:
+				if err != nil {
+					p.mu.Lock()
+					p.errors = append(p.errors, err)
+					p.mu.Unlock()
+				}
+			case <-ctx.Done():
+				return
+			}
+			blob = nil
+			blobPool.Put(blob)
 		}
-		p.resultC <- r
-		if err != nil {
-			p.mu.Lock()
-			p.errors = append(p.errors, err)
-			p.mu.Unlock()
-		}
-		blob = nil
-		blobPool.Put(blob)
-	default:
-		break
-	}
-
-	for blob := range p.queue {
-		b, err := p.f(blob)
-		r := Result{
-			B:   b,
-			Err: err,
-		}
-		p.resultC <- r
-		if err != nil {
-			p.mu.Lock()
-			p.errors = append(p.errors, err)
-			p.mu.Unlock()
-		}
-		blob = nil
-		blobPool.Put(blob)
 	}
 }
 
@@ -118,14 +118,14 @@ func (p *Proc) writer() {
 }
 
 // Run start the workers and begins reading and processing data.
-func (p *Proc) Run() error {
+func (p *Proc) Run(ctx context.Context) error {
 	p.queue = make(chan []byte)
 	p.resultC = make(chan Result)
 	p.done = make(chan bool)
 	go p.writer()
 	p.wg.Add(p.NumWorkers)
 	for i := 0; i < p.NumWorkers; i++ {
-		go p.worker()
+		go p.worker(ctx)
 	}
 	var (
 		scanner = bufio.NewScanner(p.r)
