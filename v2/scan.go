@@ -30,7 +30,7 @@ type Result struct {
 
 func New(r io.Reader, w io.Writer, f Func) *Proc {
 	proc := &Proc{r: r, w: w, f: f}
-	proc.Size = 16777216 // 16MB
+	proc.Size = defaultBatchSize // 16MB
 	proc.NumWorkers = runtime.NumCPU()
 	return proc
 }
@@ -38,22 +38,40 @@ func New(r io.Reader, w io.Writer, f Func) *Proc {
 // Proc wraps a bufio.Scanner and a processing function and will process
 // found tokens in parallel. All output will be written to a given writer.
 type Proc struct {
-	r          io.Reader
-	w          io.Writer
-	f          Func
-	Size       int
+	r io.Reader
+	w io.Writer
+	// f is a function that parses a blob of data an returns a blob of data.
+	// This may already be a single item or a list of items. In the latter case
+	// it is the task of the processing function to do further parsing
+	f Func
+	// Size is the batch size in bytes, default is 16MB, so with NumCPU number
+	// of threads a 64 core machine would end up using about 1GB of RAM
+	Size int
+	// NumWorkers is the number of threads
 	NumWorkers int
-	queue      chan []byte
-	resultC    chan Result
-	done       chan bool
-	wg         sync.WaitGroup
+
+	// queue is the channel to pass batch of data to a worker
+	queue chan []byte
+	// resultC forwards results to a sink, Result will contain a result and any
+	// error
+	resultC chan Result
+	// done signals completion of the sink processing
+	done chan bool
+	// wg will wait on all workers
+	wg sync.WaitGroup
+	// mu protects the error slice
+	mu sync.Mutex
+	// errors collects any error that happened during processing
+	errors []error
 }
 
-// worker can process a blob of bytes with the given Func.
-func (p *Proc) worker() {
+// worker can process a blob of bytes with the given Func. If a processing
+// function returns an error this worker will wind down.
+func (p *Proc) worker(ctx context.Cancel) {
 	defer p.wg.Done()
-	for blob := range p.queue {
-		// TODO: a fast line splitter, with SWAR, then apply F on each line
+	select {
+	case <-ctx.Done():
+	case blob := <-p.queue:
 		b, err := p.f(blob)
 		r := Result{
 			B:   b,
@@ -61,7 +79,27 @@ func (p *Proc) worker() {
 		}
 		p.resultC <- r
 		if err != nil {
-			break
+			p.mu.Lock()
+			p.errors = append(p.errors, err)
+			p.mu.Unlock()
+		}
+		blob = nil
+		blobPool.Put(blob)
+	default:
+		break
+	}
+
+	for blob := range p.queue {
+		b, err := p.f(blob)
+		r := Result{
+			B:   b,
+			Err: err,
+		}
+		p.resultC <- r
+		if err != nil {
+			p.mu.Lock()
+			p.errors = append(p.errors, err)
+			p.mu.Unlock()
 		}
 		blob = nil
 		blobPool.Put(blob)
@@ -70,8 +108,11 @@ func (p *Proc) worker() {
 
 // writer collects results and writes it to the setup write.
 func (p *Proc) writer() {
-	for blob := range p.resultC {
-		p.w.Write(blob.B)
+	for r := range p.resultC {
+		if r.Err != nil {
+			continue
+		}
+		_, _ = p.w.Write(r.B)
 	}
 	p.done <- true
 }
@@ -101,6 +142,9 @@ func (p *Proc) Run() error {
 		}
 		_ = copy(batch[i:], b)
 		i = i + len(b)
+		if len(p.errors) > 0 {
+			break
+		}
 	}
 	if err := scanner.Err(); err != nil {
 		return err
